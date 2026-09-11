@@ -1,0 +1,143 @@
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.deps import require_admin
+from app.models.hardware import Hardware, HardwareLoan, LoanStatus
+from app.models.stubs import Article, Event, Project
+from app.models.user import User, UserRole
+from app.schemas.admin import DashboardStats, LoanPublic, RoleChangeRequest
+from app.schemas.auth import UserPublic
+from app.schemas.envelope import success
+
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+
+
+async def _count(db: AsyncSession, model, *filters) -> int:
+    stmt = select(func.count()).select_from(model)
+    if filters:
+        stmt = stmt.where(*filters)
+    result = await db.execute(stmt)
+    return result.scalar_one()
+
+
+@router.get("/dashboard")
+async def dashboard(db: AsyncSession = Depends(get_db)):
+    stats = DashboardStats(
+        total_users=await _count(db, User),
+        active_users=await _count(db, User, User.is_active.is_(True)),
+        students=await _count(db, User, User.role == UserRole.STUDENT),
+        contributors=await _count(db, User, User.role == UserRole.CONTRIBUTOR),
+        admins=await _count(db, User, User.role == UserRole.ADMIN),
+        total_projects=await _count(db, Project),
+        total_events=await _count(db, Event),
+        total_articles=await _count(db, Article),
+        total_hardware_items=await _count(db, Hardware),
+        pending_loans=await _count(db, HardwareLoan, HardwareLoan.status == LoanStatus.PENDING),
+        approved_loans=await _count(db, HardwareLoan, HardwareLoan.status == LoanStatus.APPROVED),
+    )
+    return success(data=stats.model_dump())
+
+
+@router.get("/users")
+async def list_users(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    users = result.scalars().all()
+    data = [UserPublic.model_validate(u).model_dump(mode="json") for u in users]
+    return success(data=data)
+
+
+@router.put("/users/{user_id}/role")
+async def change_role(user_id: str, payload: RoleChangeRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.role = payload.role
+    await db.commit()
+    await db.refresh(user)
+    return success(data=UserPublic.model_validate(user).model_dump(mode="json"), message="Role updated")
+
+
+@router.delete("/users/{user_id}")
+async def deactivate_user(user_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Soft-delete only: Tech Doc §4.3 forbids cascade-deleting a user's
+    # projects/articles/loans, so we deactivate rather than hard-delete.
+    user.is_active = False
+    await db.commit()
+    return success(message="User deactivated")
+
+
+@router.get("/loans")
+async def list_loans(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(HardwareLoan).order_by(HardwareLoan.request_date.desc()))
+    loans = result.scalars().all()
+    data = [LoanPublic.model_validate(loan).model_dump(mode="json") for loan in loans]
+    return success(data=data)
+
+
+@router.put("/loans/{loan_id}/approve")
+async def approve_loan(
+    loan_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)
+):
+    loan = await _get_loan_or_404(db, loan_id)
+    if loan.status != LoanStatus.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Loan is not pending")
+
+    hardware = await _get_hardware_for_update(db, loan.hardware_id)
+    if hardware.available_quantity < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No units available to lend")
+
+    # Single transactional update, per Tech Doc §4.3, to avoid drift between
+    # loan status and hardware.available_quantity.
+    hardware.available_quantity -= 1
+    if hardware.available_quantity == 0:
+        hardware.status = hardware.status.__class__.BORROWED
+
+    loan.status = LoanStatus.APPROVED
+    loan.approved_by_id = admin.id
+    loan.approval_date = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(loan)
+    return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan approved")
+
+
+@router.put("/loans/{loan_id}/reject")
+async def reject_loan(loan_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    loan = await _get_loan_or_404(db, loan_id)
+    if loan.status != LoanStatus.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Loan is not pending")
+
+    loan.status = LoanStatus.REJECTED
+    loan.approved_by_id = admin.id
+    loan.approval_date = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(loan)
+    return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan rejected")
+
+
+async def _get_loan_or_404(db: AsyncSession, loan_id: str) -> HardwareLoan:
+    result = await db.execute(select(HardwareLoan).where(HardwareLoan.id == loan_id))
+    loan = result.scalar_one_or_none()
+    if loan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
+    return loan
+
+
+async def _get_hardware_for_update(db: AsyncSession, hardware_id: str) -> Hardware:
+    result = await db.execute(select(Hardware).where(Hardware.id == hardware_id))
+    hardware = result.scalar_one_or_none()
+    if hardware is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware item not found")
+    return hardware

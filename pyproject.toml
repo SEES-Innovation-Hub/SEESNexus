@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+    "B008",  # FastAPI's `Depends(...)` in argument defaults is the intended pattern.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/*" = ["E", "F", "I"]

@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sees_nexus
+      POSTGRES_PASSWORD: sees_nexus
+      POSTGRES_DB: sees_nexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - sees_nexus_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sees_nexus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@db:5432/sees_nexus
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: >
+      sh -c "alembic upgrade head && python seed.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  sees_nexus_pgdata:
