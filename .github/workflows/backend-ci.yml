@@ -53,6 +53,13 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@localhost:5432/sees_nexus_test
         run: alembic upgrade head
 
+      - name: Migration round-trip (Postgres)
+        env:
+          DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@localhost:5432/sees_nexus_test
+        # The suite runs on in-memory SQLite and cannot catch enum creation
+        # ordering; this step does.
+        run: alembic upgrade head && alembic downgrade -1 && alembic upgrade head
+
       - name: Run tests
         env:
           DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@localhost:5432/sees_nexus_test

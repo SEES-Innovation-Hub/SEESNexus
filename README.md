@@ -63,15 +63,20 @@ always catch everything (e.g. some enum or index changes).
   `/api/v1/notify/{send-code,verify-code}` (OTP-gated registration)
 - **Admin vertical**: `/api/v1/admin/{dashboard,users,users/{id}/role,users/{id}
   (deactivate),loans,loans/{id}/approve,loans/{id}/reject}`
+- **Projects vertical**: `/api/v1/projects` — public paginated list (filterable
+  by `category` and `status`) and public detail; create is open to any
+  authenticated user, while update and delete require the creator or an admin.
+  `member_ids` replaces the member set wholesale; `thumbnail_url` stores a
+  Cloudinary URL supplied by the client, since this backend never uploads.
 - Standard `{status, message, data}` response envelope, including for errors
 - JWT access/refresh tokens with type checking
 - `Hardware`/`HardwareLoan` models (needed for the admin loans endpoints);
-  `Project`/`Event`/`Article` are minimal stand-in tables so the dashboard
+  `Event`/`Article` are minimal stand-in tables so the dashboard
   counts real rows instead of hardcoded numbers — replace/extend them when
   those verticals are built for real, keeping the table names the same.
 
 ## Not implemented here (other verticals / later milestones)
 
-Projects, Hardware CRUD (beyond loans), Events, Articles, and the `/upload`
+Hardware CRUD (beyond loans), Events, Articles, and the `/upload`
 Cloudinary integration are out of scope for this slice — see the task
 assignment sheets for who owns each.
