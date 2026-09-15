@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 from app.models.project import ProjectCategory, ProjectStatus
 
@@ -13,6 +14,10 @@ def _clean_tech_stack(value: list[str] | None) -> list[str] | None:
 
     These render as badges on a public page, so entry and list sizes are capped
     rather than accepting unbounded free text.
+
+    Limits raise PydanticCustomError rather than a bare ValueError: the global
+    RequestValidationError handler json-encodes exc.errors() directly, and a
+    ValueError lands in the error's ctx as a non-serializable object.
     """
     if value is None:
         return None
@@ -23,14 +28,20 @@ def _clean_tech_stack(value: list[str] | None) -> list[str] | None:
         if not item:
             continue
         if len(item) > MAX_TECH_STACK_ITEM_LENGTH:
-            raise ValueError(
-                f"tech_stack entries must be at most {MAX_TECH_STACK_ITEM_LENGTH} characters"
+            raise PydanticCustomError(
+                "tech_stack_entry_too_long",
+                "tech_stack entries must be at most {max_length} characters",
+                {"max_length": MAX_TECH_STACK_ITEM_LENGTH},
             )
         if item not in cleaned:
             cleaned.append(item)
 
     if len(cleaned) > MAX_TECH_STACK_ITEMS:
-        raise ValueError(f"tech_stack accepts at most {MAX_TECH_STACK_ITEMS} entries")
+        raise PydanticCustomError(
+            "tech_stack_too_many_entries",
+            "tech_stack accepts at most {max_items} entries",
+            {"max_items": MAX_TECH_STACK_ITEMS},
+        )
     return cleaned
 
 
