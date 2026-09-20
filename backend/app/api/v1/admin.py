@@ -10,9 +10,10 @@ from app.models.hardware import Hardware, HardwareLoan, LoanStatus
 from app.models.project import Project
 from app.models.stubs import Article, Event
 from app.models.user import User, UserRole
-from app.schemas.admin import DashboardStats, LoanPublic, RoleChangeRequest
+from app.schemas.admin import DashboardStats, RoleChangeRequest
 from app.schemas.auth import UserPublic
 from app.schemas.envelope import success
+from app.schemas.hardware import LoanPublic
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
