@@ -51,6 +51,23 @@ def _apply_availability_delta(hardware: Hardware, delta: int) -> None:
     )
 
 
+def adjust_total_quantity(hardware: Hardware, new_quantity: int) -> None:
+    """Change how many units the lab owns, carrying availability with it.
+
+    If the lab owns 5 with 2 out on loan and buys 3 more, the result is 8 owned
+    and 6 free -- not 8 free, which would forget the units that are out.
+    """
+    delta = new_quantity - hardware.quantity
+    if hardware.available_quantity + delta < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="quantity cannot be lower than the number of units currently on loan",
+        )
+
+    hardware.quantity = new_quantity
+    _apply_availability_delta(hardware, delta)
+
+
 async def request_loan(
     db: AsyncSession, hardware: Hardware, borrower: User, payload: LoanCreateRequest
 ) -> HardwareLoan:
