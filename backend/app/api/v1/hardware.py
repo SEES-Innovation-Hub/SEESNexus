@@ -121,12 +121,11 @@ async def list_my_loans(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Every state, not just the open ones: §5.4 calls this "my loan history", and
+    # a student who returns an item should still see that they once borrowed it.
     result = await db.execute(
         select(HardwareLoan)
-        .where(
-            HardwareLoan.borrower_id == current_user.id,
-            HardwareLoan.status.in_(loans.ACTIVE_LOAN_STATES),
-        )
+        .where(HardwareLoan.borrower_id == current_user.id)
         .order_by(HardwareLoan.request_date.desc())
     )
     my_loans = result.scalars().all()
