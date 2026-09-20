@@ -55,6 +55,19 @@ async def seed_hardware(
     status: HardwareStatus = HardwareStatus.AVAILABLE,
     added_by_id: str | None = None,
 ) -> Hardware:
+    if added_by_id is None:
+        user = User(
+            full_name="Seed Owner",
+            email=f"seed-owner-{datetime.now(timezone.utc).timestamp():.0f}@unilag.edu.ng",
+            password=hash_password("StrongPass1"),
+            department="EEE",
+            level="Staff",
+            role=UserRole.ADMIN,
+        )
+        db.add(user)
+        await db.flush()
+        added_by_id = user.id
+
     hardware = Hardware(
         name=name,
         description="Seeded hardware item",
@@ -64,7 +77,7 @@ async def seed_hardware(
         image_url=None,
         quantity=quantity,
         available_quantity=quantity,
-        added_by_id=added_by_id or "seed-owner",
+        added_by_id=added_by_id,
     )
     db.add(hardware)
     await db.commit()

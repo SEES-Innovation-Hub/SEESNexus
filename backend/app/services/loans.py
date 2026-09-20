@@ -76,6 +76,8 @@ async def request_loan(
     Units move on approval, not on request (§4.3) -- otherwise a student could
     empty the shelf by filing requests nobody ever approves.
     """
+    hardware = await get_hardware_for_update(db, hardware.id)
+
     if hardware.status is HardwareStatus.MAINTENANCE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

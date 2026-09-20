@@ -123,11 +123,14 @@ async def list_my_loans(
 ):
     result = await db.execute(
         select(HardwareLoan)
-        .where(HardwareLoan.borrower_id == current_user.id)
+        .where(
+            HardwareLoan.borrower_id == current_user.id,
+            HardwareLoan.status.in_(loans.ACTIVE_LOAN_STATES),
+        )
         .order_by(HardwareLoan.request_date.desc())
     )
-    loans = result.scalars().all()
-    data = [LoanPublic.model_validate(loan).model_dump(mode="json") for loan in loans]
+    my_loans = result.scalars().all()
+    data = [LoanPublic.model_validate(loan).model_dump(mode="json") for loan in my_loans]
     return success(data=data)
 
 
@@ -161,7 +164,7 @@ async def update_hardware(
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    hardware = await _get_hardware_or_404(db, hardware_id)
+    hardware = await loans.get_hardware_for_update(db, hardware_id)
 
     fields = payload.model_dump(exclude_unset=True)
     new_quantity = fields.pop("quantity", None)
