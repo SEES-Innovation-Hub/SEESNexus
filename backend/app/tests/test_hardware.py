@@ -58,7 +58,11 @@ async def seed_hardware(
     if added_by_id is None:
         user = User(
             full_name="Seed Owner",
-            email=f"seed-owner-{datetime.now(timezone.utc).timestamp():.0f}@unilag.edu.ng",
+            email=(
+                "seed-owner-"
+                f"{datetime.now(timezone.utc).isoformat(timespec='microseconds')}"
+                "@unilag.edu.ng"
+            ),
             password=hash_password("StrongPass1"),
             department="EEE",
             level="Staff",

@@ -119,6 +119,11 @@ async def request_loan(
 
 
 async def approve_loan(db: AsyncSession, loan: HardwareLoan, admin: User) -> HardwareLoan:
+    loan = (
+        await db.execute(
+            select(HardwareLoan).where(HardwareLoan.id == loan.id).with_for_update()
+        )
+    ).scalar_one()
     _assert_pending(loan)
 
     hardware = await get_hardware_for_update(db, loan.hardware_id)
@@ -139,6 +144,11 @@ async def approve_loan(db: AsyncSession, loan: HardwareLoan, admin: User) -> Har
 
 async def reject_loan(db: AsyncSession, loan: HardwareLoan, admin: User) -> HardwareLoan:
     """A rejected loan never held a unit, so the counter is untouched."""
+    loan = (
+        await db.execute(
+            select(HardwareLoan).where(HardwareLoan.id == loan.id).with_for_update()
+        )
+    ).scalar_one()
     _assert_pending(loan)
 
     loan.status = LoanStatus.REJECTED
@@ -152,6 +162,11 @@ async def reject_loan(db: AsyncSession, loan: HardwareLoan, admin: User) -> Hard
 
 async def return_loan(db: AsyncSession, loan: HardwareLoan) -> HardwareLoan:
     """Give the unit back. Who may call this is the route's decision, not ours."""
+    loan = (
+        await db.execute(
+            select(HardwareLoan).where(HardwareLoan.id == loan.id).with_for_update()
+        )
+    ).scalar_one()
     if loan.status is not LoanStatus.APPROVED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Only an approved loan can be returned"
