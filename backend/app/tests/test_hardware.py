@@ -7,7 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
-from app.models.hardware import Hardware, HardwareCategory, HardwareLoan, HardwareStatus, LoanStatus
+from app.models.hardware import (
+    Hardware,
+    HardwareCategory,
+    HardwareLoan,
+    HardwareStatus,
+    LoanStatus,
+)
 from app.models.user import User, UserRole
 from app.tests.conftest import auth_header
 
@@ -41,7 +47,14 @@ async def other_student_token(client: AsyncClient, other_student_user: User) -> 
     return resp.json()["data"]["access_token"]
 
 
-async def seed_hardware(db: AsyncSession, *, name: str = "Oscilloscope", quantity: int = 3, status: HardwareStatus = HardwareStatus.AVAILABLE, added_by_id: str | None = None) -> Hardware:
+async def seed_hardware(
+    db: AsyncSession,
+    *,
+    name: str = "Oscilloscope",
+    quantity: int = 3,
+    status: HardwareStatus = HardwareStatus.AVAILABLE,
+    added_by_id: str | None = None,
+) -> Hardware:
     hardware = Hardware(
         name=name,
         description="Seeded hardware item",
@@ -106,7 +119,11 @@ async def test_create_hardware_requires_admin_and_ignores_added_by_in_body(
     assert body["data"]["available_quantity"] == 4
 
 
-async def test_create_rejects_duplicate_serial_number(client: AsyncClient, admin_token: str, db_session: AsyncSession):
+async def test_create_rejects_duplicate_serial_number(
+    client: AsyncClient,
+    admin_token: str,
+    db_session: AsyncSession,
+):
     await seed_hardware(db_session, name="DMM-1", quantity=2)
 
     resp = await client.post(
@@ -149,7 +166,11 @@ async def test_update_quantity_keeps_available_quantity_in_sync(
     assert data["available_quantity"] == 2
 
 
-async def test_delete_hardware_is_soft_delete(client: AsyncClient, db_session: AsyncSession, admin_token: str):
+async def test_delete_hardware_is_soft_delete(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_token: str,
+):
     item = await seed_hardware(db_session, name="Bench Supply")
 
     resp = await client.delete(f"{BASE}/{item.id}", headers=auth_header(admin_token))
@@ -170,7 +191,12 @@ async def test_request_loan_happy_path_keeps_quantity_unchanged(
 
     resp = await client.post(
         f"{BASE}/{item.id}/loan",
-        json={"purpose": "Capstone lab use", "expected_return_date": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()},
+        json={
+            "purpose": "Capstone lab use",
+            "expected_return_date": (
+                datetime.now(timezone.utc) + timedelta(days=3)
+            ).isoformat(),
+        },
         headers=auth_header(student_token),
     )
     assert resp.status_code == 201
@@ -185,7 +211,12 @@ async def test_request_loan_happy_path_keeps_quantity_unchanged(
 async def test_request_loan_rejects_unavailable_or_maintenance(
     client: AsyncClient, db_session: AsyncSession, student_token: str, student_user: User
 ):
-    unavailable = await seed_hardware(db_session, name="Unavailable Kit", quantity=1, added_by_id=student_user.id)
+    unavailable = await seed_hardware(
+        db_session,
+        name="Unavailable Kit",
+        quantity=1,
+        added_by_id=student_user.id,
+    )
     unavailable.available_quantity = 0
     await db_session.commit()
 
@@ -196,7 +227,13 @@ async def test_request_loan_rejects_unavailable_or_maintenance(
     )
     assert resp.status_code == 400
 
-    maintenance = await seed_hardware(db_session, name="Maintenance Kit", quantity=2, status=HardwareStatus.MAINTENANCE, added_by_id=student_user.id)
+    maintenance = await seed_hardware(
+        db_session,
+        name="Maintenance Kit",
+        quantity=2,
+        status=HardwareStatus.MAINTENANCE,
+        added_by_id=student_user.id,
+    )
     resp = await client.post(
         f"{BASE}/{maintenance.id}/loan",
         json={"purpose": "Should fail"},
@@ -224,7 +261,12 @@ async def test_request_loan_rejects_duplicate_open_request(
 
 
 async def test_my_loans_lists_only_current_user(
-    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str, other_student_user: User, other_student_token: str
+    client: AsyncClient,
+    db_session: AsyncSession,
+    student_user: User,
+    student_token: str,
+    other_student_user: User,
+    other_student_token: str,
 ):
     hardware_a = await seed_hardware(db_session, name="Laser A", quantity=1, added_by_id=student_user.id)
     hardware_b = await seed_hardware(db_session, name="Laser B", quantity=1, added_by_id=student_user.id)
@@ -248,7 +290,12 @@ async def test_my_loans_lists_only_current_user(
 
 
 async def test_return_loan_by_borrower_updates_inventory(
-    client: AsyncClient, db_session: AsyncSession, admin_user: User, admin_token: str, student_user: User, student_token: str
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_user: User,
+    admin_token: str,
+    student_user: User,
+    student_token: str,
 ):
     item = await seed_hardware(db_session, name="Scope Return", quantity=2, added_by_id=student_user.id)
     loan = HardwareLoan(
@@ -279,7 +326,14 @@ async def test_return_loan_by_borrower_updates_inventory(
 
 
 async def test_return_loan_forbidden_for_admin_or_other_student(
-    client: AsyncClient, db_session: AsyncSession, admin_token: str, student_token: str, student_user: User, admin_user: User, other_student_user: User, other_student_token: str
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_token: str,
+    student_token: str,
+    student_user: User,
+    admin_user: User,
+    other_student_user: User,
+    other_student_token: str,
 ):
     item = await seed_hardware(db_session, name="Admin Return Guard", quantity=2, added_by_id=student_user.id)
     loan = HardwareLoan(
