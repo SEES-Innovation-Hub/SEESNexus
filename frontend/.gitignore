@@ -14,6 +14,7 @@ dist-ssr
 
 # Personal working notes — never pushed; add back deliberately with `git add -f` if ever needed.
 CLAUDE.md
+docs/DECISIONS.md
 
 # Editor directories and files
 .vscode/*

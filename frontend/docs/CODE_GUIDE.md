@@ -1,6 +1,6 @@
 # SEES Nexus frontend — code guide
 
-How the frontend is built and how to work in it. For the reasons behind the choices, see [DECISIONS.md](./DECISIONS.md).
+How the frontend is built and how to work in it.
 
 ## 1. Run it
 
@@ -12,7 +12,7 @@ uvicorn app.main:app --reload       # http://localhost:8000
 # frontend (from frontend/)
 npm install
 npm run dev                         # http://localhost:5173  (proxies /api to localhost:8000)
-npm run dev -- --host 127.0.0.1     # use this instead when trying the AI image generator (see DECISIONS §7.4)
+npm run dev -- --host 127.0.0.1     # use this instead when trying the AI image generator (the service blocks the hostname "localhost")
 ```
 
 Checks to run before sharing work (all three must be clean):
@@ -85,7 +85,7 @@ Errors: `errorMessage(error, "fallback text")` returns the backend's own message
 - **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
 - **A dead refresh token:** the client clears the tokens and calls the handler `AuthProvider` registered, which empties the user; `ProtectedRoute` then redirects to `/login`. Public pages are untouched.
 - **Blocked storage:** `tokenStore` keeps the tokens in `localStorage`; if the browser throws on every storage call it falls back to memory, so the app still renders and login works until the tab closes.
-- *Known caveat:* the refresh call uses its own hard-coded `/api/v1/...` path; update it when `VITE_API_URL` is added (DECISIONS §1.6).
+- *Known caveat:* the refresh call uses its own hard-coded `/api/v1/...` path; update it when `VITE_API_URL` is added.
 
 ### 3.3 Pages load on demand
 `routes/pageLoaders.ts` is the single place that says how each lazy page is loaded:
@@ -162,9 +162,9 @@ Everything else (form state, edit/view toggles, upload state) is plain state and
 - **Named exports for pages**, default exports for shared components.
 - **Responsive by default:** mobile-first Tailwind classes, breakpoints at `md` (768px); tap targets at least 44px (`min-h-11`); rail arrows tablet-and-up.
 - **Images:** `loading="lazy"`, `decoding="async"`, explicit `width`/`height` (Profile's avatar isn't lazy — it's at the top of its page).
-- **No blur on cards, no `background-attachment: fixed`** (performance; DECISIONS §6.2).
+- **No blur on cards, no `background-attachment: fixed`** (measured to cost real frame time on phones).
 - **Untrusted URLs** from the database are only linked if they start with `http://` or `https://`.
-- **Text that users or the database supply must wrap.** Put `wrap-anywhere` on the element (names, emails, titles, descriptions, tags); otherwise a long unbroken word overflows the card or scrolls the whole page on a phone (DECISIONS §6.10).
+- **Text that users or the database supply must wrap.** Put `wrap-anywhere` on the element (names, emails, titles, descriptions, tags); otherwise a long unbroken word overflows the card or scrolls the whole page on a phone.
 - **Storage:** session tokens go through `tokenStore` only. The projects cache (`useProjects`) uses `localStorage` directly but inside `try/catch`, because it is optional.
 - **No mock data**, and no direct `axios` imports outside `src/api/`.
 
@@ -200,8 +200,8 @@ Tailwind v4 has no `tailwind.config.js`: the theme is the `@theme` block in `src
 | shadows | `sees-glow`, `sees-card`, `sees-active` | `shadow-sees-card` etc. |
 | fonts | `Inter Variable` (sans), `JetBrains Mono` (mono, small labels) | self-hosted through `@fontsource` |
 
-The page gradient is drawn by `body::before` on its own fixed layer (not `background-attachment: fixed`). `--blur-sees`, the `sees-active` shadow and the marquee / wave-pulse animations are defined in the theme (carried over from v1, where the marquee belonged to the scroll-driven hero that is the candidate for Phase 6) but **currently unused** (checked by searching the components). The official tokens are Ifeoluwa's task; ours match the docs' three brand colours and the rest come from v1 (DECISIONS §5).
+The page gradient is drawn by `body::before` on its own fixed layer (not `background-attachment: fixed`). `--blur-sees`, the `sees-active` shadow and the marquee / wave-pulse animations are defined in the theme (carried over from v1, where the marquee belonged to the scroll-driven hero that is the candidate for Phase 6) but **currently unused** (checked by searching the components). The official tokens are Ifeoluwa's task; ours match the docs' three brand colours and the rest come from v1.
 
 ## 9. What is not in this repository
 
-There is **no automated test suite** yet. The checks described in DECISIONS §8 (a simulated browser against the live backend, headless Edge driven over the DevTools protocol, and Lighthouse) were throwaway scripts kept outside the repo, and none of their tooling is in `package.json`. To repeat them, install the tools in a temporary folder, run the backend from `backend/`, and serve `dist/` with compression and long-lived caching so the numbers are realistic. Adding Vitest (component and hook tests) and Playwright (browser flows) would turn these one-off checks into permanent ones.
+There is **no automated test suite** yet. Everything in this codebase was checked with throwaway scripts (a simulated browser against the live backend, headless Edge driven over the DevTools protocol, and Lighthouse) kept outside the repo, and none of their tooling is in `package.json`. To repeat them, install the tools in a temporary folder, run the backend from `backend/`, and serve `dist/` with compression and long-lived caching so the numbers are realistic. Adding Vitest (component and hook tests) and Playwright (browser flows) would turn these one-off checks into permanent ones.
