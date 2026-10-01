@@ -1,0 +1,207 @@
+# SEES Nexus frontend — code guide
+
+How the frontend is built and how to work in it.
+
+## 1. Run it
+
+```bash
+# backend (from backend/, see backend/README.md): SQLite works with no setup
+python seed.py                      # optional: creates admin@seesnexus.dev and student@seesnexus.dev, password ChangeMe123
+uvicorn app.main:app --reload       # http://localhost:8000
+
+# frontend (from frontend/)
+npm install
+npm run dev                         # http://localhost:5173  (proxies /api to localhost:8000)
+npm run dev -- --host 127.0.0.1     # use this instead when trying the AI image generator (the service blocks the hostname "localhost")
+```
+
+Checks to run before sharing work (all three must be clean):
+
+```bash
+npx tsc -b      # type check
+npx oxlint      # lint
+npm run build   # production build
+```
+
+**Stack:** React 19, TypeScript, Vite, Tailwind CSS v4 (CSS-based theme, no `tailwind.config.js`), React Router, Axios.
+
+## 2. Folder map
+
+```
+src/
+  main.tsx                     entry: StrictMode → BrowserRouter → AuthProvider → App
+  App.tsx                      the route table only (Landing eager; other pages lazy)
+  index.css                    Tailwind import, self-hosted fonts, theme tokens, page background
+  routes/pageLoaders.ts        how each lazy page is loaded + prefetch helpers
+  api/
+    client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage()
+    auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
+    projects.ts                listProjects (public)
+    tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
+    upload.ts                  uploadImage (assumed /upload/image contract)
+    imageGeneration.ts         generateImage (calls the image service directly)
+  types/                       hand-written types mirroring the backend schemas (auth, project, envelope)
+  context/
+    AuthContext.ts             the context + its value type
+    AuthProvider.tsx           session state and actions (login, logout, updateProfile)
+  hooks/
+    useAuth.ts                 the only way components read the session
+    useProjects.ts             project list with a remembered copy
+    usePrefetchAuthPages.ts    idle prefetch of the auth pages
+  components/                  shared UI, one folder each, default export from index.tsx
+    TextField/  ProtectedRoute/  PrefetchLink/  ImageGenerator/
+  pages/                       one folder per route-level feature, named exports
+    landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail, ProjectCard,
+               PillarsSection, TeamSection, JoinSection, LandingFooter
+    auth/      Login, Register, OtpVerification
+    profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
+    notfound/  NotFound
+    dev/       ImageGeneratorPreview  (temporary sandbox, dev builds only)
+  utils/       redirectPathForRole, projectLabels
+public/        favicon, icons, robots.txt
+docs/          this guide and the decision log
+```
+
+## 3. How the pieces connect
+
+### 3.1 Making an API call
+```
+component / hook  →  src/api/<thing>.ts  →  client.ts (axios)  →  backend
+      ▲                    unwrap() removes {status, message, data}          │
+      └──────────── plain typed data (e.g. User, PaginatedProjects) ◄────────┘
+```
+An endpoint function looks like this — one line, typed, no envelope in sight:
+
+```ts
+export function getMe() {
+  return unwrap<User>(api.get("/auth/me"));
+}
+```
+Errors: `errorMessage(error, "fallback text")` returns the backend's own message when it sent one.
+
+### 3.2 The session (`AuthProvider` + `client.ts`)
+- **On app start**, if a token is stored (read through `tokenStore`), `AuthProvider` calls `GET /auth/me`. While that runs `isLoading` is true, so `ProtectedRoute` waits instead of redirecting a signed-in user.
+- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. `redirectPathForRole` decides where to go.
+- **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
+- **A dead refresh token:** the client clears the tokens and calls the handler `AuthProvider` registered, which empties the user; `ProtectedRoute` then redirects to `/login`. Public pages are untouched.
+- **Blocked storage:** `tokenStore` keeps the tokens in `localStorage`; if the browser throws on every storage call it falls back to memory, so the app still renders and login works until the tab closes.
+- *Known caveat:* the refresh call uses its own hard-coded `/api/v1/...` path; update it when `VITE_API_URL` is added.
+
+### 3.3 Pages load on demand
+`routes/pageLoaders.ts` is the single place that says how each lazy page is loaded:
+
+```ts
+export const pageLoaders = {
+  login: () => import("../pages/auth/Login"),
+  register: () => import("../pages/auth/Register"),
+  profile: () => import("../pages/profile/Profile"),
+};
+```
+`App.tsx` renders them through `React.lazy`, and `prefetchPages()` calls the **same** imports early so the browser already has the code when the route opens. Three things trigger it: `usePrefetchAuthPages` (browser idle after Landing loads, skipped on data saver), `PrefetchLink` (hover / touch / focus), and the login/register submit handlers (start the Profile download while the request runs).
+
+### 3.4 The project rail (`useProjects`)
+```
+first render:  readCache() ── found & fresh (≤ 7 days)? ─► show those cards immediately
+                        └── else ► skeleton
+then (effect): GET /projects?page_size=12
+                 ├─ success ► show fresh list + write it to the cache
+                 └─ failure ► keep cached cards if we have them, otherwise the error state
+```
+The cache key is `sees.projects.v1.<pageSize>`. Bump `v1` if the `Project` type changes. Landing's rail shows four states: loading skeleton, error, empty, data.
+
+### 3.5 The AI image generator (`ImageGenerator`)
+`topic → generateImage()` (image service) → preview from an object URL → **Use this image** → `uploadImage()` (`/upload/image`) → `onUploaded(url)` to the host form, which stores it as the project's `thumbnail_url`. It can be cancelled, times out after 90 s, keeps the previous preview when a new attempt fails, and revokes its object URLs when replaced or unmounted.
+
+### 3.6 Registration and login
+```
+Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code)--> onVerified(code)
+     ^                                                                                    |
+     |  any failure: back to the details step with the backend's message                  v
+     +------------------------------------------------ register({...details, code}) --> login() --> GET /auth/me --> redirectPathForRole(role)
+```
+- `verify-code` **uses the code up**, and `register` only accepts an already-used code. That is why a failure at the register step sends the user back to the details form to request a fresh code, instead of leaving them on the OTP screen.
+- `Register` owns the state (`details`, `step`, `error`, `isSubmitting`); `OtpVerification` only shows the second screen.
+- **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate by role (ADMIN to `/admin`, everyone else to `/profile`).
+- Both the login submit and the register "code verified" handler call `prefetchPages("profile")` first, so the Profile code downloads while the request runs.
+
+### 3.7 Profile view and edit
+- `Profile` reads the user from `useAuth()` (filled from `GET /auth/me`) and holds one piece of state: `isEditing`. It composes `ProfileAvatar`, then either `ProfileDetails` (read-only) or `ProfileEditForm`, and has the **Log out** button.
+- `ProfileEditForm` keeps a *draft* of name, department, level and bio. On save it trims the values, refuses blank name/department, and builds `changes` containing **only fields that differ** from the current user. No changes closes the form without a request; otherwise `updateProfile(changes)` runs `PUT /auth/me` and the provider replaces the user with the response.
+- `ProfileAvatar`: pick a file, `uploadImage(file)` returns a URL, then `updateProfile({ profile_image_url })`. A failed upload shows a message and leaves the current photo.
+
+### 3.8 How Landing is put together
+`Landing` only composes: `LandingNav`, then in `<main>` `HeroSection`, `ProjectShowcaseRail`, `PillarsSection`, `TeamSection`, `JoinSection`, and `LandingFooter`. The nav, hero, join banner and footer are **auth-aware** (`useAuth()`): signed-out visitors see Log in / Register / Get started, signed-in users see Profile links and no join banner, and nothing is shown while the session is still being restored.
+
+| Element | Phone (under 768px) | Tablet and up |
+|---|---|---|
+| Hero headline | smaller text | larger text |
+| Project rail | swipe; arrows hidden | arrows visible (44px) |
+| Pillars | stacked | three columns |
+| Team | 2 x 2 | 4 across |
+| Footer | stacked | three columns |
+
+`Landing` also calls `usePrefetchAuthPages()`. Project cards render only `http(s)` demo and GitHub links (the values are user-typed).
+
+## 4. Every `useEffect` and why it exists
+
+The team rule is "justify every effect". There are exactly four, each with a comment in the code:
+
+| Where | Why it must be an effect |
+|---|---|
+| `AuthProvider` | On mount: restore a session from browser storage, and subscribe to the API client's session-expired signal — both are external systems. |
+| `useProjects` | Fetch from the API on mount (external system); an `ignore` flag drops stale results. |
+| `usePrefetchAuthPages` | Wait for the browser's idle time — an external scheduler. |
+| `ImageGenerator` | Revoke the preview's object URL when it changes or on unmount — an external resource that must also be cleaned up on unmount. |
+
+Everything else (form state, edit/view toggles, upload state) is plain state and event handlers.
+
+## 5. Conventions we followed
+
+- **Components small and single-purpose** (all under the ~150–200 line guideline; the largest is `Register` at ~147). `Profile` and `Landing` are shells that compose focused pieces.
+- **Shared component = used on 2+ pages** (`TextField`, `PrefetchLink`, `ProtectedRoute`); otherwise it stays next to its page.
+- **Named exports for pages**, default exports for shared components.
+- **Responsive by default:** mobile-first Tailwind classes, breakpoints at `md` (768px); tap targets at least 44px (`min-h-11`); rail arrows tablet-and-up.
+- **Images:** `loading="lazy"`, `decoding="async"`, explicit `width`/`height` (Profile's avatar isn't lazy — it's at the top of its page).
+- **No blur on cards, no `background-attachment: fixed`** (measured to cost real frame time on phones).
+- **Untrusted URLs** from the database are only linked if they start with `http://` or `https://`.
+- **Text that users or the database supply must wrap.** Put `wrap-anywhere` on the element (names, emails, titles, descriptions, tags); otherwise a long unbroken word overflows the card or scrolls the whole page on a phone.
+- **Storage:** session tokens go through `tokenStore` only. The projects cache (`useProjects`) uses `localStorage` directly but inside `try/catch`, because it is optional.
+- **No mock data**, and no direct `axios` imports outside `src/api/`.
+
+## 6. Adding a new page
+
+1. Create `src/pages/<feature>/<Name>.tsx` with a **named export**.
+2. Add a loader in `routes/pageLoaders.ts` (`name: () => import("../pages/<feature>/<Name>")`) and, if links should prefetch it, a path entry in `PAGE_FOR_PATH`.
+3. In `App.tsx` add `const Name = lazy(() => pageLoaders.name().then((m) => ({ default: m.Name })))` and a `<Route>`; wrap it in `ProtectedRoute` if it needs a signed-in user.
+4. Link to it with `PrefetchLink` (from `components/PrefetchLink`) instead of `Link`.
+5. Read the user with `useAuth()`; never call the API from the component directly.
+6. Check it at 320, 390 and 820 px, and that every tap target is at least 44px.
+
+## 7. Adding an API call
+
+1. Add or extend the type in `src/types/` (mirror the backend schema).
+2. Add a function in `src/api/<thing>.ts`: `return unwrap<YourType>(api.get("/path"))`.
+3. If a page needs it on load, wrap it in a hook under `src/hooks/` (see `useProjects`); otherwise call it from an event handler.
+4. Show `errorMessage(error, "fallback")` to the user, and design the failure state, not just the happy path.
+
+## 8. Theme and styling
+
+Tailwind v4 has no `tailwind.config.js`: the theme is the `@theme` block in `src/index.css`, and each token becomes utility classes automatically.
+
+| Token | Value | Used as |
+|---|---|---|
+| `sees-void` | `#000f0d` | page base, input backgrounds (`bg-sees-void/60`) |
+| `sees-forest` | `#002d22` | text on mint buttons |
+| `sees-teal` | `#004d40` | borders (`border-sees-teal/40`) |
+| `sees-mint` | `#a7ffeb` | headings, primary buttons, accents |
+| `sees-mustard` | `#e4a11b` | links, secondary accent |
+| `sees-glass` | `rgba(0,45,34,.4)` | placeholder panels |
+| gradients | `gradient-sees`, `gradient-card` | page background layer, card backgrounds (`bg-gradient-card`) |
+| shadows | `sees-glow`, `sees-card`, `sees-active` | `shadow-sees-card` etc. |
+| fonts | `Inter Variable` (sans), `JetBrains Mono` (mono, small labels) | self-hosted through `@fontsource` |
+
+The page gradient is drawn by `body::before` on its own fixed layer (not `background-attachment: fixed`). `--blur-sees`, the `sees-active` shadow and the marquee / wave-pulse animations are defined in the theme (carried over from v1, where the marquee belonged to the scroll-driven hero that is the candidate for Phase 6) but **currently unused** (checked by searching the components). The official tokens are Ifeoluwa's task; ours match the docs' three brand colours and the rest come from v1.
+
+## 9. What is not in this repository
+
+There is **no automated test suite** yet. Everything in this codebase was checked with throwaway scripts (a simulated browser against the live backend, headless Edge driven over the DevTools protocol, and Lighthouse) kept outside the repo, and none of their tooling is in `package.json`. To repeat them, install the tools in a temporary folder, run the backend from `backend/`, and serve `dist/` with compression and long-lived caching so the numbers are realistic. Adding Vitest (component and hook tests) and Playwright (browser flows) would turn these one-off checks into permanent ones.

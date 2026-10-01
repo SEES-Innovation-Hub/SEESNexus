@@ -1,0 +1,77 @@
+@import "tailwindcss";
+/* Self-hosted (no third-party font requests). Inter is one variable file covering
+   every weight; JetBrains Mono is only used at regular weight for small labels. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource/jetbrains-mono/latin-400.css";
+
+/* SEES Nexus brand palette, carried over from the v1 tailwind.config.js.
+   Tailwind v4 is CSS-config (no tailwind.config.js) - theme is the
+   equivalent of v3's theme.extend, and each namespace below maps to the
+   same utilities v3 generated (colors -> bg-sees-* / text-sees-*, shadow ->
+   shadow-sees-*, etc). */
+@theme {
+  --color-sees-forest: #002d22;
+  --color-sees-mint: #a7ffeb;
+  --color-sees-mustard: #e4a11b;
+  --color-sees-teal: #004d40;
+  --color-sees-void: #000f0d;
+  --color-sees-glass: rgba(0, 45, 34, 0.4);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --background-image-gradient-sees: linear-gradient(135deg, #000f0d 0%, #002d22 50%, #004d40 100%);
+  --background-image-gradient-card: linear-gradient(145deg, rgba(0, 45, 34, 0.6) 0%, rgba(0, 77, 64, 0.3) 100%);
+
+  --shadow-sees-glow: 0 0 30px rgba(167, 255, 235, 0.15);
+  --shadow-sees-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-sees-active: 0 0 20px rgba(167, 255, 235, 0.3);
+
+  --blur-sees: 20px;
+
+  --animate-marquee-left: marquee-left 22s linear infinite;
+  --animate-marquee-right: marquee-right 26s linear infinite;
+  --animate-wave-pulse: wave-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes marquee-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+@keyframes marquee-right {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+@keyframes wave-pulse {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.35);
+  }
+}
+
+body {
+  background-color: var(--color-sees-void);
+  color: white;
+  min-height: 100vh;
+}
+
+/* The gradient sits on its own fixed layer: `background-attachment: fixed` on
+   body forces a repaint every scroll frame on many mobile browsers. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--background-image-gradient-sees);
+}
