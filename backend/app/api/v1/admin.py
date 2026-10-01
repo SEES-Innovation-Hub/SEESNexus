@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,9 +8,11 @@ from app.models.hardware import Hardware, HardwareLoan, LoanStatus
 from app.models.project import Project
 from app.models.stubs import Article, Event
 from app.models.user import User, UserRole
-from app.schemas.admin import DashboardStats, LoanPublic, RoleChangeRequest
+from app.schemas.admin import DashboardStats, RoleChangeRequest
 from app.schemas.auth import UserPublic
 from app.schemas.envelope import success
+from app.schemas.hardware import LoanPublic
+from app.services import loans
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -90,41 +90,17 @@ async def list_loans(db: AsyncSession = Depends(get_db)):
 async def approve_loan(
     loan_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)
 ):
+    # State checks and the available_quantity arithmetic live in the service, per
+    # Tech Doc §4.3 -- the /hardware return route shares the same code.
     loan = await _get_loan_or_404(db, loan_id)
-    if loan.status != LoanStatus.PENDING:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Loan is not pending")
-
-    hardware = await _get_hardware_for_update(db, loan.hardware_id)
-    if hardware.available_quantity < 1:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No units available to lend")
-
-    # Single transactional update, per Tech Doc §4.3, to avoid drift between
-    # loan status and hardware.available_quantity.
-    hardware.available_quantity -= 1
-    if hardware.available_quantity == 0:
-        hardware.status = hardware.status.__class__.BORROWED
-
-    loan.status = LoanStatus.APPROVED
-    loan.approved_by_id = admin.id
-    loan.approval_date = datetime.now(timezone.utc)
-
-    await db.commit()
-    await db.refresh(loan)
+    loan = await loans.approve_loan(db, loan, admin)
     return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan approved")
 
 
 @router.put("/loans/{loan_id}/reject")
 async def reject_loan(loan_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     loan = await _get_loan_or_404(db, loan_id)
-    if loan.status != LoanStatus.PENDING:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Loan is not pending")
-
-    loan.status = LoanStatus.REJECTED
-    loan.approved_by_id = admin.id
-    loan.approval_date = datetime.now(timezone.utc)
-
-    await db.commit()
-    await db.refresh(loan)
+    loan = await loans.reject_loan(db, loan, admin)
     return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan rejected")
 
 
@@ -134,11 +110,3 @@ async def _get_loan_or_404(db: AsyncSession, loan_id: str) -> HardwareLoan:
     if loan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
     return loan
-
-
-async def _get_hardware_for_update(db: AsyncSession, hardware_id: str) -> Hardware:
-    result = await db.execute(select(Hardware).where(Hardware.id == hardware_id))
-    hardware = result.scalar_one_or_none()
-    if hardware is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware item not found")
-    return hardware

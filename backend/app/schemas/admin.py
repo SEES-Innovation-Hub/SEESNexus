@@ -1,8 +1,5 @@
-from datetime import datetime
+from pydantic import BaseModel
 
-from pydantic import BaseModel, ConfigDict
-
-from app.models.hardware import LoanStatus
 from app.models.user import UserRole
 
 
@@ -24,16 +21,5 @@ class RoleChangeRequest(BaseModel):
     role: UserRole
 
 
-class LoanPublic(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    hardware_id: str
-    borrower_id: str
-    approved_by_id: str | None
-    status: LoanStatus
-    purpose: str
-    request_date: datetime | None
-    approval_date: datetime | None
-    expected_return_date: datetime | None
-    actual_return_date: datetime | None
+# LoanPublic moved to app/schemas/hardware.py -- a loan is a hardware entity and
+# both the /admin and /hardware routes serialize it.
