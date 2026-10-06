@@ -6,7 +6,8 @@ from app.core.database import get_db
 from app.core.deps import require_admin
 from app.models.hardware import Hardware, HardwareLoan, LoanStatus
 from app.models.project import Project
-from app.models.stubs import Article, Event
+from app.models.events import Event
+from app.models.stubs import Article
 from app.models.user import User, UserRole
 from app.schemas.admin import DashboardStats, RoleChangeRequest
 from app.schemas.auth import UserPublic
