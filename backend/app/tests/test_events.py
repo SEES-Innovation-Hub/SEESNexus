@@ -4,7 +4,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from app.models.events import Event, EventRegistration, EventType, RegistrationStatus
+from app.models.events import EventRegistration
 from app.models.user import User
 from app.tests.conftest import auth_header
 
