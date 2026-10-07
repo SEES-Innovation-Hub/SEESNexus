@@ -170,7 +170,7 @@ All in `src/components/`, one folder each, default export. See every one of them
 
 | Component | Use it for | Notes |
 |---|---|---|
-| `Button` | Every button | Variants `primary` · `secondary` · `ghost` · `danger` (delete/reject only). `isLoading` shows a spinner and blocks clicks. **`type` defaults to `"button"`**, so form submit buttons must say `type="submit"`. |
+| `Button` | Every button | Variants `primary` · `secondary` · `ghost` · `danger` (delete/reject only). `isLoading` shows a spinner and blocks clicks but keeps the full colour (busy, not unavailable); `disabled` turns it grey. **`type` defaults to `"button"`**, so form submit buttons must say `type="submit"`. |
 | `buttonClassName()` | A link that should look like a button | `<PrefetchLink className={buttonClassName("secondary")}>` |
 | `Card` | The glass panel | `as="article" \| "section" \| "li"`, `padding="none" \| "md" \| "lg"`. |
 | `Badge` | Status / category labels | Tones `mint` · `mustard` · `red` · `neutral`. Map values to tones next to their label map in `utils/`. |
