@@ -8,7 +8,6 @@ import PrefetchLink from "../../components/PrefetchLink";
 import ProjectCard from "../../components/ProjectCard";
 import Select from "../../components/Select";
 import Skeleton from "../../components/Skeleton";
-import { useAuth } from "../../hooks/useAuth";
 import { useProjectList } from "../../hooks/useProjectList";
 import { useUrlFilters } from "../../hooks/useUrlFilters";
 import {
@@ -21,7 +20,6 @@ import {
 const PAGE_SIZE = 12;
 
 export function ProjectsList() {
-  const { user } = useAuth();
   const { page, isFiltered, read, setFilter, setPage, clearAll } = useUrlFilters();
   const category = read("category", isProjectCategory);
   const status = read("status", isProjectStatus);
@@ -43,16 +41,10 @@ export function ProjectsList() {
             {data && data.total > 0 && ` · ${data.total} ${data.total === 1 ? "project" : "projects"}`}
           </p>
         </div>
-        {user ? (
-          <PrefetchLink to="/projects/new" className={buttonClassName()}>
-            <Plus aria-hidden="true" className="size-4" />
-            New project
-          </PrefetchLink>
-        ) : (
-          <PrefetchLink to="/login" className={buttonClassName("secondary")}>
-            Log in to add a project
-          </PrefetchLink>
-        )}
+        <PrefetchLink to="/projects/new" className={buttonClassName()}>
+          <Plus aria-hidden="true" className="size-4" />
+          New project
+        </PrefetchLink>
       </div>
 
       <div className="grid max-w-xl gap-4 sm:grid-cols-2">
@@ -102,11 +94,9 @@ export function ProjectsList() {
             title="No projects yet"
             message="Be the first to showcase your work."
             action={
-              user && (
-                <PrefetchLink to="/projects/new" className={buttonClassName()}>
-                  New project
-                </PrefetchLink>
-              )
+              <PrefetchLink to="/projects/new" className={buttonClassName()}>
+                New project
+              </PrefetchLink>
             }
           />
         )

@@ -4,8 +4,8 @@ import PrefetchLink from "../../components/PrefetchLink";
 import { useAuth } from "../../hooks/useAuth";
 
 // min-h-11 = 44px, the touch-target size recommended for phones.
-const navLinkBase = "min-h-11 items-center px-3 whitespace-nowrap text-sees-mint hover:text-white";
-const navLinkClassName = `inline-flex ${navLinkBase}`;
+const navLinkClassName =
+  "inline-flex min-h-11 items-center px-3 whitespace-nowrap text-sees-mint hover:text-white";
 
 export function LandingNav() {
   const { user, isLoading } = useAuth();
@@ -20,16 +20,16 @@ export function LandingNav() {
       </Link>
 
       <nav aria-label="Main" className="flex items-center gap-2 text-sm">
-        {/* Too tight next to Log in / Register on phones, where "View all
-            projects" under the rail is the way in. */}
-        <PrefetchLink to="/projects" className={`hidden sm:inline-flex ${navLinkBase}`}>
-          Projects
-        </PrefetchLink>
         {!isLoading &&
           (user ? (
-            <PrefetchLink to="/profile" className={navLinkClassName}>
-              Profile
-            </PrefetchLink>
+            <>
+              <PrefetchLink to="/projects" className={navLinkClassName}>
+                Projects
+              </PrefetchLink>
+              <PrefetchLink to="/profile" className={navLinkClassName}>
+                Profile
+              </PrefetchLink>
+            </>
           ) : (
             <>
               <PrefetchLink to="/login" className={navLinkClassName}>

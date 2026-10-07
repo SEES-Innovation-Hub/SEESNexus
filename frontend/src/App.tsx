@@ -35,45 +35,23 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        {/* The app's inner pages share the sidebar layout. Some are public (browsing
-            projects); the rest are wrapped in ProtectedRoute one by one. Admin-only
-            pages will additionally be wrapped in AdminRoute (Phase 3). */}
-        <Route element={<AppLayout />}>
+        {/* Everything inside the app is for signed-in members; visitors only get
+            Landing, Login and Register. Admin-only pages will additionally be
+            wrapped in AdminRoute (Phase 3). */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route path="/projects" element={<ProjectsList />} />
+          <Route path="/projects/new" element={<NewProject />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
-          <Route
-            path="/projects/new"
-            element={
-              <ProtectedRoute>
-                <NewProject />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/projects/:id/edit"
-            element={
-              <ProtectedRoute>
-                <EditProject />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/projects/:id/edit" element={<EditProject />} />
           <Route path="/hardware" element={<HardwareList />} />
-          <Route
-            path="/loans"
-            element={
-              <ProtectedRoute>
-                <MyLoans />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/loans" element={<MyLoans />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
         {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}
         {import.meta.env.DEV && (

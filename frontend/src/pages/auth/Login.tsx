@@ -1,17 +1,20 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { errorMessage } from "../../api/client";
 import Button from "../../components/Button";
 import Card from "../../components/Card";
 import PrefetchLink from "../../components/PrefetchLink";
 import TextField from "../../components/TextField";
 import { useAuth } from "../../hooks/useAuth";
-import { prefetchPages } from "../../routes/pageLoaders";
+import { prefetchPageForPath, prefetchPages } from "../../routes/pageLoaders";
 import { redirectPathForRole } from "../../utils/redirectPathForRole";
+import { readReturnPath } from "../../utils/returnPath";
 
 export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  // Set when a members-only page sent them here (ProtectedRoute).
+  const returnPath = readReturnPath(useLocation().state);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -21,11 +24,12 @@ export function Login() {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
-    // Overlaps the Profile download with the login request instead of waiting for it.
-    prefetchPages("profile");
+    // Overlaps the next page's download with the login request instead of waiting for it.
+    if (returnPath) prefetchPageForPath(returnPath);
+    else prefetchPages("profile");
     try {
       const loggedInUser = await login(email, password);
-      navigate(redirectPathForRole(loggedInUser.role));
+      navigate(returnPath ?? redirectPathForRole(loggedInUser.role), { replace: true });
     } catch (loginError) {
       setError(errorMessage(loginError, "Could not reach the server. Try again."));
     } finally {

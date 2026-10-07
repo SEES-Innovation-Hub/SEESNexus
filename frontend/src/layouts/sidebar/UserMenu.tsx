@@ -1,9 +1,7 @@
-import { ChevronsUpDown, LogIn, LogOut, UserRound } from "lucide-react";
+import { ChevronsUpDown, LogOut, UserRound } from "lucide-react";
 import { useId, useRef } from "react";
 import { Link } from "react-router-dom";
 import Avatar from "../../components/Avatar";
-import { buttonClassName } from "../../components/Button/buttonClassName";
-import PrefetchLink from "../../components/PrefetchLink";
 import { useAuth } from "../../hooks/useAuth";
 
 const itemClassName =
@@ -14,14 +12,12 @@ const itemClassName =
 // anywhere else and sits above everything, with no JavaScript of our own.
 // It is pinned to the bottom-left corner, where the sidebar always is.
 export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  const { user, isLoading, logout } = useAuth();
+  const { user, logout } = useAuth();
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Nothing while a stored session is being restored, so a signed-in person
-  // doesn't see "Log in" flash first.
-  if (isLoading) return null;
-  if (!user) return <GuestActions collapsed={collapsed} onNavigate={onNavigate} />;
+  // ProtectedRoute never renders the layout without a user; this narrows the type.
+  if (!user) return null;
 
   return (
     <div className="border-t border-sees-teal/40 p-3">
@@ -77,31 +73,3 @@ export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavi
   );
 }
 
-// Visitors browsing public pages (projects) get sign-in links instead.
-function GuestActions({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  if (collapsed) {
-    return (
-      <div className="border-t border-sees-teal/40 p-3">
-        <PrefetchLink
-          to="/login"
-          onClick={onNavigate}
-          aria-label="Log in"
-          title="Log in"
-          className="flex min-h-12 items-center justify-center rounded-lg text-sees-mint hover:bg-sees-mint/5"
-        >
-          <LogIn aria-hidden="true" className="size-5" />
-        </PrefetchLink>
-      </div>
-    );
-  }
-  return (
-    <div className="grid gap-2 border-t border-sees-teal/40 p-3">
-      <PrefetchLink to="/login" onClick={onNavigate} className={buttonClassName("secondary")}>
-        Log in
-      </PrefetchLink>
-      <PrefetchLink to="/register" onClick={onNavigate} className={buttonClassName()}>
-        Register
-      </PrefetchLink>
-    </div>
-  );
-}

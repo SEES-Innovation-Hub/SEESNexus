@@ -4,8 +4,6 @@ export interface NavItem {
   label: string;
   to: string;
   icon: LucideIcon;
-  // Hidden from visitors who aren't signed in.
-  requiresAuth?: boolean;
 }
 
 export interface NavGroup {
@@ -25,8 +23,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Projects", to: "/projects", icon: FolderKanban },
       { label: "Hardware", to: "/hardware", icon: Cpu },
-      { label: "My Loans", to: "/loans", icon: ArrowLeftRight, requiresAuth: true },
-      { label: "Profile", to: "/profile", icon: UserRound, requiresAuth: true },
+      { label: "My Loans", to: "/loans", icon: ArrowLeftRight },
+      { label: "Profile", to: "/profile", icon: UserRound },
     ],
   },
 ];

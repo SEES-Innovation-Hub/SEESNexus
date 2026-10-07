@@ -20,7 +20,6 @@ const CATEGORY_ICONS: Record<HardwareCategory, LucideIcon> = {
 
 interface HardwareCardProps {
   item: Hardware;
-  isSignedIn: boolean;
   // The viewer's pending or approved loan for this item, if any.
   activeLoan: Loan | undefined;
   onRequest: () => void;
@@ -28,7 +27,7 @@ interface HardwareCardProps {
 
 // The action matches what the backend would allow, so nobody fills in a
 // request that is bound to be refused.
-function CardAction({ item, isSignedIn, activeLoan, onRequest }: HardwareCardProps) {
+function CardAction({ item, activeLoan, onRequest }: HardwareCardProps) {
   if (activeLoan) {
     return (
       <PrefetchLink id={cardActionId(item.id)} to="/loans" className={buttonClassName("secondary", "w-full")}>
@@ -41,13 +40,6 @@ function CardAction({ item, isSignedIn, activeLoan, onRequest }: HardwareCardPro
   }
   if (item.available_quantity < 1) {
     return <p className="py-3 text-center text-sm text-white/50">None available right now.</p>;
-  }
-  if (!isSignedIn) {
-    return (
-      <PrefetchLink to="/login" className={buttonClassName("secondary", "w-full")}>
-        Log in to borrow
-      </PrefetchLink>
-    );
   }
   return (
     <Button onClick={onRequest} className="w-full">

@@ -15,10 +15,7 @@ const linkBase =
 export function SidebarNav({ collapsed, onNavigate }: SidebarNavProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
-  const groups = navGroups
-    .filter((group) => !group.adminOnly || isAdmin)
-    .map((group) => ({ ...group, items: group.items.filter((item) => !item.requiresAuth || user) }))
-    .filter((group) => group.items.length > 0);
+  const groups = navGroups.filter((group) => !group.adminOnly || isAdmin);
 
   return (
     <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-4">

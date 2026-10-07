@@ -209,18 +209,18 @@ All in `src/components/`, one folder each, default export. See every one of them
 ### 3.11 The signed-in layout (sidebar)
 ```
 App.tsx
-  <Route element={<AppLayout/>}>
-     <Route path="/projects" … />                                   ← public
-     <Route path="/projects/new" element={<ProtectedRoute>…} />     ← signed in only
-     <Route path="/profile" element={<ProtectedRoute>…} />
+  <Route element={<ProtectedRoute><AppLayout/></ProtectedRoute>}>
+     <Route path="/projects" … />      ← every app page goes here: members only
+     <Route path="/profile" … />
   </Route>
+  Landing, /login and /register are the only public pages.
 AppLayout
   laptop (≥1024px): <aside> sidebar  (logo · collapse button · SidebarNav · UserMenu)
   below 1024px:     top bar with ☰  → the same sidebar in a <dialog> drawer
   <main id="main"> <Suspense> <Outlet/>   ← the page
 ```
-- **Links** come from `layouts/sidebar/navItems.ts`, in groups ("General", later "Admin" with `adminOnly: true`). A link is added only when its page exists; `requiresAuth: true` hides it from visitors.
-- **Visitors** can open the public pages (Projects) inside the same layout. The bottom of the sidebar then shows **Log in / Register** instead of the user menu (nothing at all while a stored session is still being restored, so signed-in people don't see a flash of "Log in").
+- **Links** come from `layouts/sidebar/navItems.ts`, in groups ("General", later "Admin" with `adminOnly: true`). A link is added only when its page exists.
+- **Members only:** visitors who open any app page are sent to `/login` by `ProtectedRoute`, which passes the page they wanted as navigation state (`{ from }`). After logging in, `Login` takes them back there (`utils/returnPath.ts` only accepts same-site paths). Without a `from`, login goes to the role's start page as before.
 - **Active link:** `NavLink` highlights the open page and sets `aria-current="page"`.
 - **Collapse** (laptop only) shrinks the sidebar to icons and is remembered in `localStorage` (`sees.sidebar.collapsed`, inside try/catch). Collapsed labels stay readable by screen readers, and hovering shows a tooltip.
 - **Phone drawer** uses `useModalDialog`, so focus trap, Esc, focus return and scroll lock work like `Modal`. It closes on a link, Esc, a tap outside, or when the window grows to laptop size. It slides in and out (and the backdrop fades); the slide-out relies on `transition-discrete`, so browsers without it just close instantly. Reduced-motion users get no animation.
@@ -232,8 +232,8 @@ AppLayout
 ### 3.12 Projects
 | Route | Who | Page |
 |---|---|---|
-| `/projects` | anyone | `ProjectsList`: category/status filters, 12 per page |
-| `/projects/:id` | anyone | `ProjectDetail`: Edit/Delete only when `canEditProject` |
+| `/projects` | signed in | `ProjectsList`: category/status filters, 12 per page |
+| `/projects/:id` | signed in | `ProjectDetail`: Edit/Delete only when `canEditProject` |
 | `/projects/new` | signed in | `NewProject` → `ProjectForm` |
 | `/projects/:id/edit` | creator or admin | `EditProject` → `ProjectForm`; others see "You can't edit this project" |
 
@@ -250,11 +250,11 @@ AppLayout
 ### 3.13 Hardware and loans
 | Route | Who | Page |
 |---|---|---|
-| `/hardware` | anyone | `HardwareList`: category/availability filters, 12 per page; "Request loan" opens `LoanRequestModal` |
+| `/hardware` | signed in | `HardwareList`: category/availability filters, 12 per page; "Request loan" opens `LoanRequestModal` |
 | `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected) |
 
 - **Shared list filters:** `useUrlFilters()` gives `page`, `read(name, guard)` (a value only counts if the guard recognises it), `setFilter` (returns to page 1), `setPage` (scrolls to the top) and `clearAll`. Projects and Hardware both use it.
-- **The card's action matches what the backend would allow:** your pending/approved loan → a link to My Loans. Under maintenance or none left → the reason, for everyone. Visitor → "Log in to borrow". Otherwise "Request loan". The backend refuses duplicates, maintenance items and empty shelves, so nobody fills in a request that's bound to fail.
+- **The card's action matches what the backend would allow:** your pending/approved loan → a link to My Loans. Under maintenance or none left → the reason. Otherwise "Request loan". The backend refuses duplicates, maintenance items and empty shelves, so nobody fills in a request that's bound to fail.
 - **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once. `useReturnLoan` refreshes My Loans and the hardware lists.
 - **Focus after a request:** the card's button is replaced by a link, so the dialog can't return focus to it. `HardwareList` focuses the new link (`cardActionId`) two frames after closing. Cancelling still returns focus to the button the normal way.
 - **Return date:** optional, can't be before tomorrow, sent as the end of that day in the borrower's time zone.

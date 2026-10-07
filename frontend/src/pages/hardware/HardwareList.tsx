@@ -5,7 +5,6 @@ import ErrorState from "../../components/ErrorState";
 import Pagination from "../../components/Pagination";
 import Select from "../../components/Select";
 import Skeleton from "../../components/Skeleton";
-import { useAuth } from "../../hooks/useAuth";
 import { useHardwareList } from "../../hooks/useHardwareList";
 import { useMyLoans } from "../../hooks/useMyLoans";
 import { useUrlFilters } from "../../hooks/useUrlFilters";
@@ -23,7 +22,6 @@ import { LoanRequestModal } from "./LoanRequestModal";
 const PAGE_SIZE = 12;
 
 export function HardwareList() {
-  const { user } = useAuth();
   const { page, isFiltered, read, setFilter, setPage, clearAll } = useUrlFilters();
   const category = read("category", isHardwareCategory);
   const status = read("status", isHardwareStatus);
@@ -119,7 +117,6 @@ export function HardwareList() {
               <li key={item.id}>
                 <HardwareCard
                   item={item}
-                  isSignedIn={user !== null}
                   activeLoan={activeLoans.get(item.id)}
                   onRequest={() => setRequesting(item)}
                 />
