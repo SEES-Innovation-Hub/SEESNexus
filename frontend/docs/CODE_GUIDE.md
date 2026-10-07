@@ -29,14 +29,16 @@ npm run build   # production build
 
 ```
 src/
-  main.tsx                     entry: StrictMode → BrowserRouter → AuthProvider → App
+  main.tsx                     entry: StrictMode → QueryClientProvider → BrowserRouter → AuthProvider → App
   App.tsx                      the route table only (Landing eager; other pages lazy)
   index.css                    Tailwind import, self-hosted fonts, theme tokens, page background
   routes/pageLoaders.ts        how each lazy page is loaded + prefetch helpers
   api/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
-    projects.ts                listProjects (public)
+    projects.ts                listProjects (public; page, pageSize, category, status)
+    queryClient.ts             the shared TanStack Query cache and its defaults
+    queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
     tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
     upload.ts                  uploadImage (assumed /upload/image contract)
     imageGeneration.ts         generateImage (calls the image service directly)
@@ -46,7 +48,7 @@ src/
     AuthProvider.tsx           session state and actions (login, logout, updateProfile)
   hooks/
     useAuth.ts                 the only way components read the session
-    useProjects.ts             project list with a remembered copy
+    useProjects.ts             Landing's project list (useQuery + a remembered copy)
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
   components/                  shared UI, one folder each, default export from index.tsx
     TextField/  ProtectedRoute/  PrefetchLink/  ImageGenerator/
@@ -99,20 +101,37 @@ export const pageLoaders = {
 ```
 `App.tsx` renders them through `React.lazy`, and `prefetchPages()` calls the **same** imports early so the browser already has the code when the route opens. Three things trigger it: `usePrefetchAuthPages` (browser idle after Landing loads, skipped on data saver), `PrefetchLink` (hover / touch / focus), and the login/register submit handlers (start the Profile download while the request runs).
 
-### 3.4 The project rail (`useProjects`)
+### 3.4 Loading data from the API (TanStack Query)
+Every API **read** a page needs on load goes through TanStack Query's `useQuery`, wrapped in a hook under `src/hooks/`. It sits on top of our axios functions; it does not replace them.
+
+```ts
+export function useSomething(id: string) {
+  return useQuery({
+    queryKey: queryKeys.something.detail(id),   // its name in the cache
+    queryFn: () => getSomething(id),             // the plain function from src/api/
+  });
+}
 ```
-first render:  readCache() ── found & fresh (≤ 7 days)? ─► show those cards immediately
+What we get for free: one request even if two components ask for the same data, loading/error flags, a quiet refresh when you come back to a page, and one retry on network or server errors (never on a 4xx, which would just fail again). Defaults live in `api/queryClient.ts` (data counts as fresh for 30 s).
+
+- **After a change** (create/edit/delete), refresh what it affected: `queryClient.invalidateQueries({ queryKey: queryKeys.projects.all })`. Keys are nested, so `["projects"]` also refreshes every list and detail under it. Name every key in `api/queryKeys.ts`, never inline.
+- **On login, logout and session expiry** `AuthProvider` empties the whole cache, so one person's private data (their loans, the admin's user list) never shows to the next person on a shared computer.
+- The signed-in user is **not** in the query cache; it stays in `AuthProvider` (§3.2).
+
+### 3.5 The project rail (`useProjects`)
+```
+first render:  readCache() ── found & fresh (≤ 7 days)? ─► show those cards immediately (marked stale)
                         └── else ► skeleton
-then (effect): GET /projects?page_size=12
+at once:       useQuery → GET /projects?page_size=12
                  ├─ success ► show fresh list + write it to the cache
                  └─ failure ► keep cached cards if we have them, otherwise the error state
 ```
-The cache key is `sees.projects.v1.<pageSize>`. Bump `v1` if the `Project` type changes. Landing's rail shows four states: loading skeleton, error, empty, data.
+The saved copy is handed to `useQuery` as `initialData` with its real save time, so it is shown instantly but refreshed straight away. The cache key is `sees.projects.v2.<pageSize>`. Bump the version if the `Project` type changes. Landing's rail shows four states: loading skeleton, error, empty, data.
 
-### 3.5 The AI image generator (`ImageGenerator`)
+### 3.6 The AI image generator (`ImageGenerator`)
 `topic → generateImage()` (image service) → preview from an object URL → **Use this image** → `uploadImage()` (`/upload/image`) → `onUploaded(url)` to the host form, which stores it as the project's `thumbnail_url`. It can be cancelled, times out after 90 s, keeps the previous preview when a new attempt fails, and revokes its object URLs when replaced or unmounted.
 
-### 3.6 Registration and login
+### 3.7 Registration and login
 ```
 Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code)--> onVerified(code)
      ^                                                                                    |
@@ -124,12 +143,12 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 - **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate by role (ADMIN to `/admin`, everyone else to `/profile`).
 - Both the login submit and the register "code verified" handler call `prefetchPages("profile")` first, so the Profile code downloads while the request runs.
 
-### 3.7 Profile view and edit
+### 3.8 Profile view and edit
 - `Profile` reads the user from `useAuth()` (filled from `GET /auth/me`) and holds one piece of state: `isEditing`. It composes `ProfileAvatar`, then either `ProfileDetails` (read-only) or `ProfileEditForm`, and has the **Log out** button.
 - `ProfileEditForm` keeps a *draft* of name, department, level and bio. On save it trims the values, refuses blank name/department, and builds `changes` containing **only fields that differ** from the current user. No changes closes the form without a request; otherwise `updateProfile(changes)` runs `PUT /auth/me` and the provider replaces the user with the response.
 - `ProfileAvatar`: pick a file, `uploadImage(file)` returns a URL, then `updateProfile({ profile_image_url })`. A failed upload shows a message and leaves the current photo.
 
-### 3.8 How Landing is put together
+### 3.9 How Landing is put together
 `Landing` only composes: `LandingNav`, then in `<main>` `HeroSection`, `ProjectShowcaseRail`, `PillarsSection`, `TeamSection`, `JoinSection`, and `LandingFooter`. The nav, hero, join banner and footer are **auth-aware** (`useAuth()`): signed-out visitors see Log in / Register / Get started, signed-in users see Profile links and no join banner, and nothing is shown while the session is still being restored.
 
 | Element | Phone (under 768px) | Tablet and up |
@@ -144,12 +163,11 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 
 ## 4. Every `useEffect` and why it exists
 
-The team rule is "justify every effect". There are exactly four, each with a comment in the code:
+The team rule is "justify every effect". There are exactly three, each with a comment in the code (API reads use `useQuery` instead of an effect, §3.4):
 
 | Where | Why it must be an effect |
 |---|---|
 | `AuthProvider` | On mount: restore a session from browser storage, and subscribe to the API client's session-expired signal — both are external systems. |
-| `useProjects` | Fetch from the API on mount (external system); an `ignore` flag drops stale results. |
 | `usePrefetchAuthPages` | Wait for the browser's idle time — an external scheduler. |
 | `ImageGenerator` | Revoke the preview's object URL when it changes or on unmount — an external resource that must also be cleaned up on unmount. |
 
@@ -181,7 +199,7 @@ Everything else (form state, edit/view toggles, upload state) is plain state and
 
 1. Add or extend the type in `src/types/` (mirror the backend schema).
 2. Add a function in `src/api/<thing>.ts`: `return unwrap<YourType>(api.get("/path"))`.
-3. If a page needs it on load, wrap it in a hook under `src/hooks/` (see `useProjects`); otherwise call it from an event handler.
+3. If a page needs it on load, wrap it in a `useQuery` hook under `src/hooks/` and add its key to `api/queryKeys.ts` (§3.4); otherwise call it from an event handler. After a change, invalidate the keys it affected.
 4. Show `errorMessage(error, "fallback")` to the user, and design the failure state, not just the happy path.
 
 ## 8. Theme and styling
