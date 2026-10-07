@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
+import GuestRoute from "./components/GuestRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Landing } from "./pages/landing/Landing";
 import { NotFound } from "./pages/notfound/NotFound";
@@ -32,11 +33,32 @@ function App() {
     // spinner would only flash for the few milliseconds a small chunk takes.
     <Suspense fallback={null}>
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        {/* Everything inside the app is for signed-in members; visitors only get
-            Landing, Login and Register. Admin-only pages will additionally be
+        {/* Visitors only: signed-in members are taken into the app. */}
+        <Route
+          path="/"
+          element={
+            <GuestRoute>
+              <Landing />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <GuestRoute>
+              <Login />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <GuestRoute>
+              <Register />
+            </GuestRoute>
+          }
+        />
+        {/* Everything inside the app is for signed-in members. Admin-only pages will additionally be
             wrapped in AdminRoute (Phase 3). */}
         <Route
           element={

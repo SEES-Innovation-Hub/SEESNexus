@@ -1,12 +1,8 @@
 import { buttonClassName } from "../../components/Button/buttonClassName";
 import PrefetchLink from "../../components/PrefetchLink";
-import { useAuth } from "../../hooks/useAuth";
 
-// A pitch to sign up means nothing to someone who already has an account.
+// Landing is only shown to visitors (GuestRoute), so the pitch always applies.
 export function JoinSection() {
-  const { user, isLoading } = useAuth();
-  if (isLoading || user) return null;
-
   return (
     <section
       aria-labelledby="join-heading"

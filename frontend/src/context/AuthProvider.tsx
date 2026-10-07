@@ -16,6 +16,7 @@ function signOut(setUser: (user: User | null) => void) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loggedOutAt, setLoggedOutAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(
     () => tokenStore.getAccess() !== null,
   );
@@ -40,12 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.setBoth(tokens.access_token, tokens.refresh_token);
     const loggedInUser = await authApi.getMe();
     queryClient.clear();
+    setLoggedOutAt(null);
     setUser(loggedInUser);
     return loggedInUser;
   }
 
-  function logout() {
+  function logout(locationKey: string) {
     tokenStore.clear();
+    setLoggedOutAt(locationKey);
     signOut(setUser);
   }
 
@@ -55,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, logout, updateProfile }}
+      value={{ user, isLoading, loggedOutAt, login, logout, updateProfile }}
     >
       {children}
     </AuthContext.Provider>

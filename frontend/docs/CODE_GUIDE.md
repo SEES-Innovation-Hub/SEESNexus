@@ -55,6 +55,7 @@ src/
     ToastContext.ts / ToastProvider.tsx   the toast messages (showToast) and where they render
   hooks/
     useAuth.ts                 the only way components read the session
+    useLogout.ts               what every "Log out" button calls (§3.2)
     useShowcaseProjects.ts     Landing's rail (useQuery + a remembered copy, §3.5)
     useProjectList.ts          a page of projects with filters (Projects page)
     useProject.ts              one project (shows a list's copy instantly, §3.12)
@@ -70,7 +71,7 @@ src/
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    Avatar/  ProtectedRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/   (see §3.10)
+    Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail,
                PillarsSection, TeamSection, JoinSection, LandingFooter
@@ -83,7 +84,7 @@ src/
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
   utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
-               isHttpUrl, canEditProject
+               isHttpUrl, canEditProject, returnPath
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -107,7 +108,9 @@ Errors: `errorMessage(error, "fallback text")` returns the backend's own message
 
 ### 3.2 The session (`AuthProvider` + `client.ts`)
 - **On app start**, if a token is stored (read through `tokenStore`), `AuthProvider` calls `GET /auth/me`. While that runs `isLoading` is true, so `ProtectedRoute` waits instead of redirecting a signed-in user.
-- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. `redirectPathForRole` decides where to go.
+- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. It goes to the page the person wanted (`returnPath`, see §3.11) or else their home, `redirectPathForRole` (Projects for every role until the Phase 3 Dashboard).
+- **Who sees what:** visitors get only Landing, `/login` and `/register`. `GuestRoute` sends a signed-in member away from those three to their home, so they never see Landing again until they log out. Every app page sits inside one `ProtectedRoute`.
+- **Log out** (`useLogout()`) clears the tokens and records the page it was pressed on (`loggedOutAt` = that page's `location.key`). `ProtectedRoute` sends exactly that page to Landing. Any later visit to an app page (a showcase card, Back) goes to login as usual. Keying it to one history entry, rather than a flag that stays on, is what stops "after logging out, clicking a project bounces back to Landing".
 - **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
 - **A dead refresh token:** the client clears the tokens and calls the handler `AuthProvider` registered, which empties the user; `ProtectedRoute` then redirects to `/login`. Public pages are untouched.
 - **Blocked storage:** `tokenStore` keeps the tokens in `localStorage`; if the browser throws on every storage call it falls back to memory, so the app still renders and login works until the tab closes.

@@ -2,12 +2,14 @@ import { useState } from "react";
 import Button from "../../components/Button";
 import Card from "../../components/Card";
 import { useAuth } from "../../hooks/useAuth";
+import { useLogout } from "../../hooks/useLogout";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { ProfileDetails } from "./ProfileDetails";
 import { ProfileEditForm } from "./ProfileEditForm";
 
 export function Profile() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const logout = useLogout();
   const [isEditing, setIsEditing] = useState(false);
 
   // ProtectedRoute never renders this without a user; this narrows the type.

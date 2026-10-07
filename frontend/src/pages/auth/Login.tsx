@@ -6,7 +6,7 @@ import Card from "../../components/Card";
 import PrefetchLink from "../../components/PrefetchLink";
 import TextField from "../../components/TextField";
 import { useAuth } from "../../hooks/useAuth";
-import { prefetchPageForPath, prefetchPages } from "../../routes/pageLoaders";
+import { prefetchPageForPath } from "../../routes/pageLoaders";
 import { redirectPathForRole } from "../../utils/redirectPathForRole";
 import { readReturnPath } from "../../utils/returnPath";
 
@@ -25,8 +25,7 @@ export function Login() {
     setError(null);
     setIsSubmitting(true);
     // Overlaps the next page's download with the login request instead of waiting for it.
-    if (returnPath) prefetchPageForPath(returnPath);
-    else prefetchPages("profile");
+    prefetchPageForPath(returnPath ?? "/projects");
     try {
       const loggedInUser = await login(email, password);
       navigate(returnPath ?? redirectPathForRole(loggedInUser.role), { replace: true });
