@@ -39,9 +39,9 @@ src/
     sidebar/SidebarNav.tsx     the grouped links (expanded or icons-only)
     sidebar/UserMenu.tsx       the signed-in person + Profile / Log out menu
   api/
-    client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage()
+    client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
-    projects.ts                listProjects (public; page, pageSize, category, status)
+    projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
     tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
@@ -54,22 +54,27 @@ src/
     ToastContext.ts / ToastProvider.tsx   the toast messages (showToast) and where they render
   hooks/
     useAuth.ts                 the only way components read the session
-    useProjects.ts             Landing's project list (useQuery + a remembered copy)
+    useShowcaseProjects.ts     Landing's rail (useQuery + a remembered copy, §3.5)
+    useProjectList.ts          a page of projects with filters (Projects page)
+    useProject.ts              one project (shows a list's copy instantly, §3.12)
+    useCreateProject.ts / useUpdateProject.ts / useDeleteProject.ts   changes; each refreshes the lists
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
     useToast.ts                the only way components show a toast
     useModalDialog.ts          opens/closes a native <dialog> as a modal (Modal + the phone drawer)
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    Avatar/  ProtectedRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/      (see §3.10 for what each is for)
+    Avatar/  ProtectedRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
-    landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail, ProjectCard,
+    landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail,
                PillarsSection, TeamSection, JoinSection, LandingFooter
     auth/      Login, Register, OtpVerification
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
+    projects/  ProjectsList, ProjectDetail, NewProject, EditProject, ProjectForm, TechStackInput,
+               ProjectNotFound, projectFormValues (values, limits, validation)
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
-  utils/       redirectPathForRole, projectLabels
+  utils/       redirectPathForRole, projectLabels (labels, select options, URL checks), isHttpUrl, canEditProject
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -128,7 +133,7 @@ What we get for free: one request even if two components ask for the same data, 
 - **On login, logout and session expiry** `AuthProvider` empties the whole cache, so one person's private data (their loans, the admin's user list) never shows to the next person on a shared computer.
 - The signed-in user is **not** in the query cache; it stays in `AuthProvider` (§3.2).
 
-### 3.5 The project rail (`useProjects`)
+### 3.5 The project rail (`useShowcaseProjects`)
 ```
 first render:  readCache() ── found & fresh (≤ 7 days)? ─► show those cards immediately (marked stale)
                         └── else ► skeleton
@@ -189,27 +194,49 @@ All in `src/components/`, one folder each, default export. See every one of them
 | `TextField`, `TextArea`, `Select` | Form fields | Built on `Field` (label + hint + error). `error` turns the border red and is read out by screen readers. Optional fields are labelled "(optional)" automatically. |
 | `Avatar` | A person's photo or initial | `name`, `imageUrl`, `size` (px). Decorative: put the name next to it. |
 | `AdminRoute` | Wrapping admin-only pages | Not signed in → `/login`; not an admin → their own start page. The backend enforces the real rule. |
+| `ProjectCard` | A project in a list | The whole card links to the project; the parent sets its width (rail: fixed, Projects page: grid column). |
 | `useToast().showToast(msg, tone?)` | Short feedback after an action | `"success"` (default) or `"error"`; fades after 5 s, max 3 at once. |
 
 ### 3.11 The signed-in layout (sidebar)
 ```
 App.tsx
-  <Route element={<ProtectedRoute><AppLayout/></ProtectedRoute>}>
-     <Route path="/profile" … />          ← every signed-in page goes here
+  <Route element={<AppLayout/>}>
+     <Route path="/projects" … />                                   ← public
+     <Route path="/projects/new" element={<ProtectedRoute>…} />     ← signed in only
+     <Route path="/profile" element={<ProtectedRoute>…} />
   </Route>
 AppLayout
   laptop (≥1024px): <aside> sidebar  (logo · collapse button · SidebarNav · UserMenu)
   below 1024px:     top bar with ☰  → the same sidebar in a <dialog> drawer
   <main id="main"> <Suspense> <Outlet/>   ← the page
 ```
-- **Links** come from `layouts/sidebar/navItems.ts`, in groups ("General", later "Admin" with `adminOnly: true`). A link is added only when its page exists.
+- **Links** come from `layouts/sidebar/navItems.ts`, in groups ("General", later "Admin" with `adminOnly: true`). A link is added only when its page exists; `requiresAuth: true` hides it from visitors.
+- **Visitors** can open the public pages (Projects) inside the same layout. The bottom of the sidebar then shows **Log in / Register** instead of the user menu (nothing at all while a stored session is still being restored, so signed-in people don't see a flash of "Log in").
 - **Active link:** `NavLink` highlights the open page and sets `aria-current="page"`.
 - **Collapse** (laptop only) shrinks the sidebar to icons and is remembered in `localStorage` (`sees.sidebar.collapsed`, inside try/catch). Collapsed labels stay readable by screen readers, and hovering shows a tooltip.
 - **Phone drawer** uses `useModalDialog`, so focus trap, Esc, focus return and scroll lock work like `Modal`. It closes on a link, Esc, a tap outside, or when the window grows to laptop size. It slides in and out (and the backdrop fades); the slide-out relies on `transition-discrete`, so browsers without it just close instantly. Reduced-motion users get no animation.
 - **User menu** uses the browser's `popover` attribute (closes on Esc or click-away, no JS of ours). It is pinned to the bottom-left, where the sidebar always is.
 - **Skip link:** the first Tab on any signed-in page focuses "Skip to content", which jumps past the sidebar.
-- **Loading:** `AppLayout` is its own chunk (~4 KB gz), so Landing never downloads it. Prefetching a signed-in page also prefetches the layout (`SIGNED_IN_PAGES` in `pageLoaders.ts`).
+- **Loading:** `AppLayout` is its own chunk (~4 KB gz), so Landing never downloads it. Prefetching any page inside it also prefetches the layout (`LAYOUT_PAGES` in `pageLoaders.ts`). Links with an id (`/projects/abc`) are matched by `PAGE_FOR_PATTERN`.
 - **Icons:** `lucide-react`. Import each icon by name; only the icons used end up in the bundle. Always pass `aria-hidden="true"` next to visible text.
+
+### 3.12 Projects
+| Route | Who | Page |
+|---|---|---|
+| `/projects` | anyone | `ProjectsList`: category/status filters, 12 per page |
+| `/projects/:id` | anyone | `ProjectDetail`: Edit/Delete only when `canEditProject` |
+| `/projects/new` | signed in | `NewProject` → `ProjectForm` |
+| `/projects/:id/edit` | creator or admin | `EditProject` → `ProjectForm`; others see "You can't edit this project" |
+
+- **Filters and page live in the address bar** (`?category=IOT&status=COMPLETED&page=2`) via `useSearchParams`. Back/Forward and shared links work, and no effect syncs them. Unknown values (typed by hand) count as "no filter" (`isProjectCategory` / `isProjectStatus`). Changing a filter returns to page 1.
+- **While the next page loads** the old cards stay, dimmed (`keepPreviousData`), instead of flashing to skeletons.
+- **Opening a project from a list is instant:** `useProject` uses the list's copy as placeholder data while the fresh record loads. `EditProject` waits for the fresh record, because the form copies its starting values once.
+- **Permissions** come from `utils/canEditProject.ts`, which mirrors the backend rule (creator or admin). The UI only hides what can't be done; the backend still decides.
+- **`ProjectForm`** owns the field values and validation (`projectFormValues.ts`: limits copied from the backend schema, per-field messages, and `toPayload` turning empty links into `null`). The pages decide what Save does. `noValidate` replaces the browser's popups with our own messages, and the first invalid field gets focus.
+- **Tech stack** chips: Enter or comma adds one, Backspace on an empty box removes the last, and text left in the box is added when it loses focus. Max 20 chips of 50 characters (backend limits).
+- **Members:** on create the creator is sent as the only member (`member_ids: [user.id]`). Edit never sends `member_ids`, so the backend keeps the team. A member picker needs a user-search endpoint the backend doesn't have yet.
+- **No thumbnail field** until `/upload/image` exists. Cards and the detail page show the category as a stand-in.
+- **After a change:** create/update put the new record straight into the detail cache and refresh every list. Delete removes the detail and refreshes the lists.
 
 ## 4. Every `useEffect` and why it exists
 

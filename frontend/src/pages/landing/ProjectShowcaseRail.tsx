@@ -1,6 +1,7 @@
 import { useRef } from "react";
-import { useProjects } from "../../hooks/useProjects";
-import { ProjectCard } from "./ProjectCard";
+import PrefetchLink from "../../components/PrefetchLink";
+import ProjectCard from "../../components/ProjectCard";
+import { useShowcaseProjects } from "../../hooks/useShowcaseProjects";
 
 const RAIL_SIZE = 12;
 const SKELETON_COUNT = 3;
@@ -10,7 +11,7 @@ const arrowClassName =
   "flex size-11 items-center justify-center rounded-full border border-sees-teal text-sees-mint hover:border-sees-mint";
 
 export function ProjectShowcaseRail() {
-  const state = useProjects(RAIL_SIZE);
+  const state = useShowcaseProjects(RAIL_SIZE);
   const railRef = useRef<HTMLDivElement>(null);
 
   function scrollRail(direction: 1 | -1) {
@@ -39,6 +40,12 @@ export function ProjectShowcaseRail() {
               </span>
             )}
           </p>
+          <PrefetchLink
+            to="/projects"
+            className="-my-3 mt-1 inline-block py-3 text-sm text-sees-mustard underline hover:text-sees-mint"
+          >
+            View all projects
+          </PrefetchLink>
         </div>
         {hasProjects && (
           <div className="hidden gap-2 md:flex">
@@ -82,7 +89,12 @@ export function ProjectShowcaseRail() {
           className="flex snap-x snap-mandatory gap-5 overflow-x-auto px-2 py-6 focus-visible:outline-2 focus-visible:outline-sees-mint"
         >
           {state.projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <div
+              key={project.id}
+              className="w-72 shrink-0 snap-start transition-transform duration-200 focus-within:z-10 focus-within:scale-105 hover:z-10 hover:scale-105"
+            >
+              <ProjectCard project={project} />
+            </div>
           ))}
         </div>
       )}
