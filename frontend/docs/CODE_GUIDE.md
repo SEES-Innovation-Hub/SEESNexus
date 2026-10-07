@@ -205,7 +205,7 @@ AppLayout
 - **Links** come from `layouts/sidebar/navItems.ts`, in groups ("General", later "Admin" with `adminOnly: true`). A link is added only when its page exists.
 - **Active link:** `NavLink` highlights the open page and sets `aria-current="page"`.
 - **Collapse** (laptop only) shrinks the sidebar to icons and is remembered in `localStorage` (`sees.sidebar.collapsed`, inside try/catch). Collapsed labels stay readable by screen readers, and hovering shows a tooltip.
-- **Phone drawer** uses `useModalDialog`, so focus trap, Esc, focus return and scroll lock work like `Modal`. It closes on a link, Esc, a tap outside, or when the window grows to laptop size.
+- **Phone drawer** uses `useModalDialog`, so focus trap, Esc, focus return and scroll lock work like `Modal`. It closes on a link, Esc, a tap outside, or when the window grows to laptop size. It slides in and out (and the backdrop fades); the slide-out relies on `transition-discrete`, so browsers without it just close instantly. Reduced-motion users get no animation.
 - **User menu** uses the browser's `popover` attribute (closes on Esc or click-away, no JS of ours). It is pinned to the bottom-left, where the sidebar always is.
 - **Skip link:** the first Tab on any signed-in page focuses "Skip to content", which jumps past the sidebar.
 - **Loading:** `AppLayout` is its own chunk (~4 KB gz), so Landing never downloads it. Prefetching a signed-in page also prefetches the layout (`SIGNED_IN_PAGES` in `pageLoaders.ts`).

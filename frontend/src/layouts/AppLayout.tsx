@@ -145,7 +145,11 @@ export function AppLayout() {
         onClick={(event) => {
           if (event.target === event.currentTarget) closeDrawer();
         }}
-        className="m-0 h-dvh max-h-none w-72 max-w-[85vw] border-r border-sees-teal/60 bg-sees-void p-0 text-white transition-transform duration-200 backdrop:bg-black/60 motion-reduce:transition-none starting:open:-translate-x-full lg:hidden"
+        // Slides in AND out. A closing <dialog> is normally hidden in one frame;
+        // transition-discrete (allow-discrete on display/overlay) keeps it on screen
+        // until the slide-out ends. Browsers without it simply close instantly.
+        // starting:open: is where the slide-in starts from.
+        className="m-0 h-dvh max-h-none w-72 max-w-[85vw] -translate-x-full border-r border-sees-teal/60 bg-sees-void p-0 text-white transition-[translate,overlay,display] transition-discrete duration-200 ease-out backdrop:bg-black/60 backdrop:opacity-0 backdrop:transition-[opacity,overlay,display] backdrop:transition-discrete backdrop:duration-200 open:translate-x-0 open:backdrop:opacity-100 motion-reduce:transition-none motion-reduce:backdrop:transition-none starting:open:-translate-x-full starting:open:backdrop:opacity-0 lg:hidden"
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between gap-2 px-3 pt-4">
