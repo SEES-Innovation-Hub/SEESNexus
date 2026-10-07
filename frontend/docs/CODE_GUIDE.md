@@ -32,7 +32,12 @@ src/
   main.tsx                     entry: StrictMode → QueryClientProvider → BrowserRouter → AuthProvider → App
   App.tsx                      the route table only (Landing eager; other pages lazy)
   index.css                    Tailwind import, self-hosted fonts, theme tokens, page background
-  routes/pageLoaders.ts        how each lazy page is loaded + prefetch helpers
+  routes/pageLoaders.ts        how each lazy page (and the AppLayout) is loaded + prefetch helpers
+  layouts/
+    AppLayout.tsx              the sidebar frame around every signed-in page (§3.11)
+    sidebar/navItems.ts        every sidebar link, grouped; add a link here when its page exists
+    sidebar/SidebarNav.tsx     the grouped links (expanded or icons-only)
+    sidebar/UserMenu.tsx       the signed-in person + Profile / Log out menu
   api/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
@@ -52,10 +57,11 @@ src/
     useProjects.ts             Landing's project list (useQuery + a remembered copy)
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
     useToast.ts                the only way components show a toast
+    useModalDialog.ts          opens/closes a native <dialog> as a modal (Modal + the phone drawer)
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    ProtectedRoute/  PrefetchLink/  ImageGenerator/      (see §3.10 for what each is for)
+    Avatar/  ProtectedRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/      (see §3.10 for what each is for)
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail, ProjectCard,
                PillarsSection, TeamSection, JoinSection, LandingFooter
@@ -181,17 +187,40 @@ All in `src/components/`, one folder each, default export. See every one of them
 | `Modal` | Any dialog | Native `<dialog>`: focus trap, Esc, focus return and the backdrop come from the browser. `dismissible={false}` while a request runs. Page scroll is locked in CSS (`index.css`). |
 | `ConfirmDialog` | "Are you sure?" before delete/reject | `isPending` spins the button and blocks closing. |
 | `TextField`, `TextArea`, `Select` | Form fields | Built on `Field` (label + hint + error). `error` turns the border red and is read out by screen readers. Optional fields are labelled "(optional)" automatically. |
+| `Avatar` | A person's photo or initial | `name`, `imageUrl`, `size` (px). Decorative: put the name next to it. |
+| `AdminRoute` | Wrapping admin-only pages | Not signed in → `/login`; not an admin → their own start page. The backend enforces the real rule. |
 | `useToast().showToast(msg, tone?)` | Short feedback after an action | `"success"` (default) or `"error"`; fades after 5 s, max 3 at once. |
+
+### 3.11 The signed-in layout (sidebar)
+```
+App.tsx
+  <Route element={<ProtectedRoute><AppLayout/></ProtectedRoute>}>
+     <Route path="/profile" … />          ← every signed-in page goes here
+  </Route>
+AppLayout
+  laptop (≥1024px): <aside> sidebar  (logo · collapse button · SidebarNav · UserMenu)
+  below 1024px:     top bar with ☰  → the same sidebar in a <dialog> drawer
+  <main id="main"> <Suspense> <Outlet/>   ← the page
+```
+- **Links** come from `layouts/sidebar/navItems.ts`, in groups ("General", later "Admin" with `adminOnly: true`). A link is added only when its page exists.
+- **Active link:** `NavLink` highlights the open page and sets `aria-current="page"`.
+- **Collapse** (laptop only) shrinks the sidebar to icons and is remembered in `localStorage` (`sees.sidebar.collapsed`, inside try/catch). Collapsed labels stay readable by screen readers, and hovering shows a tooltip.
+- **Phone drawer** uses `useModalDialog`, so focus trap, Esc, focus return and scroll lock work like `Modal`. It closes on a link, Esc, a tap outside, or when the window grows to laptop size.
+- **User menu** uses the browser's `popover` attribute (closes on Esc or click-away, no JS of ours). It is pinned to the bottom-left, where the sidebar always is.
+- **Skip link:** the first Tab on any signed-in page focuses "Skip to content", which jumps past the sidebar.
+- **Loading:** `AppLayout` is its own chunk (~4 KB gz), so Landing never downloads it. Prefetching a signed-in page also prefetches the layout (`SIGNED_IN_PAGES` in `pageLoaders.ts`).
+- **Icons:** `lucide-react`. Import each icon by name; only the icons used end up in the bundle. Always pass `aria-hidden="true"` next to visible text.
 
 ## 4. Every `useEffect` and why it exists
 
-The team rule is "justify every effect". There are exactly four, each with a comment in the code (API reads use `useQuery` instead of an effect, §3.4):
+The team rule is "justify every effect". There are exactly five, each with a comment in the code (API reads use `useQuery` instead of an effect, §3.4):
 
 | Where | Why it must be an effect |
 |---|---|
 | `AuthProvider` | On mount: restore a session from browser storage, and subscribe to the API client's session-expired signal — both are external systems. |
 | `usePrefetchAuthPages` | Wait for the browser's idle time — an external scheduler. |
-| `Modal` | Sync the `open` prop to the `<dialog>` element's `showModal()` / `close()` — a DOM API with no attribute equivalent for a modal. |
+| `useModalDialog` (Modal, phone drawer) | Sync the `open` prop to the `<dialog>` element's `showModal()` / `close()` — a DOM API with no attribute equivalent for a modal. |
+| `AppLayout` | Listen for the window reaching laptop width and close the phone drawer — screen size is outside React. |
 | `ImageGenerator` | Revoke the preview's object URL when it changes or on unmount — an external resource that must also be cleaned up on unmount. |
 
 Everything else (form state, edit/view toggles, upload state) is plain state and event handlers.
@@ -215,7 +244,7 @@ Everything else (form state, edit/view toggles, upload state) is plain state and
 
 1. Create `src/pages/<feature>/<Name>.tsx` with a **named export**.
 2. Add a loader in `routes/pageLoaders.ts` (`name: () => import("../pages/<feature>/<Name>")`) and, if links should prefetch it, a path entry in `PAGE_FOR_PATH`.
-3. In `App.tsx` add `const Name = lazy(() => pageLoaders.name().then((m) => ({ default: m.Name })))` and a `<Route>`; wrap it in `ProtectedRoute` if it needs a signed-in user.
+3. In `App.tsx` add `const Name = lazy(() => pageLoaders.name().then((m) => ({ default: m.Name })))` and a `<Route>`. **Signed-in pages go inside the `AppLayout` route** (they get the sidebar and the login check); also add the page name to `SIGNED_IN_PAGES` in `pageLoaders.ts` and its link to `layouts/sidebar/navItems.ts`. Admin pages are additionally wrapped in `AdminRoute`.
 4. Link to it with `PrefetchLink` (from `components/PrefetchLink`) instead of `Link`.
 5. Read the user with `useAuth()`; never call the API from the component directly.
 6. Check it at 320, 390 and 820 px, and that every tap target is at least 44px.

@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 
 interface ModalProps {
   open: boolean;
@@ -16,18 +17,8 @@ interface ModalProps {
 // everything else: no library and no focus-trap code of our own. index.css
 // stops the page behind it from scrolling.
 export default function Modal({ open, onClose, title, children, footer, dismissible = true }: ModalProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useModalDialog(open);
   const titleId = useId();
-
-  // Opening a modal <dialog> needs the DOM call showModal() (the `open`
-  // attribute alone shows it without the backdrop or focus trap), so the
-  // `open` prop is synced to the element here: an external DOM API.
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
 
   return (
     <dialog

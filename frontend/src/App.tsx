@@ -11,6 +11,7 @@ import { pageLoaders } from "./routes/pageLoaders";
 // (The loaders live in routes/pageLoaders so links can prefetch the same code.)
 const Login = lazy(() => pageLoaders.login().then((m) => ({ default: m.Login })));
 const Register = lazy(() => pageLoaders.register().then((m) => ({ default: m.Register })));
+const AppLayout = lazy(() => pageLoaders.appLayout().then((m) => ({ default: m.AppLayout })));
 const Profile = lazy(() => pageLoaders.profile().then((m) => ({ default: m.Profile })));
 const ComponentsPreview = lazy(() =>
   import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
@@ -28,14 +29,17 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        {/* Signed-in pages share the sidebar layout. Admin-only pages will go in
+            a nested route wrapped in AdminRoute (Phase 3). */}
         <Route
-          path="/profile"
           element={
             <ProtectedRoute>
-              <Profile />
+              <AppLayout />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route path="/profile" element={<Profile />} />
+        </Route>
         {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}
         {import.meta.env.DEV && (
           <Route

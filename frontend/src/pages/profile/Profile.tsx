@@ -12,8 +12,9 @@ export function Profile() {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
-      <div className="w-full max-w-md space-y-6 rounded-2xl border border-sees-teal/40 bg-gradient-card p-8 shadow-sees-card">
+    // Inside AppLayout: the sidebar provides the page frame, so this is just the card.
+    <div className="mx-auto w-full max-w-md">
+      <div className="space-y-6 rounded-2xl border border-sees-teal/40 bg-gradient-card p-6 shadow-sees-card sm:p-8">
         <div className="flex flex-col items-center gap-3 text-center">
           <ProfileAvatar imageUrl={user.profile_image_url} name={user.full_name} />
           <h1 className="text-2xl font-semibold wrap-anywhere text-sees-mint">{user.full_name}</h1>
