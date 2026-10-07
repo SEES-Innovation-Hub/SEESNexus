@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { buttonClassName } from "../../components/Button/buttonClassName";
 import PrefetchLink from "../../components/PrefetchLink";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -29,10 +30,7 @@ export function LandingNav() {
               <PrefetchLink to="/login" className={navLinkClassName}>
                 Log in
               </PrefetchLink>
-              <PrefetchLink
-                to="/register"
-                className="inline-flex min-h-11 items-center rounded bg-sees-mint px-4 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow"
-              >
+              <PrefetchLink to="/register" className={buttonClassName()}>
                 Register
               </PrefetchLink>
             </>

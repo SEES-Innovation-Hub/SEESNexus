@@ -1,9 +1,10 @@
 import type { ButtonHTMLAttributes } from "react";
 import Spinner from "../Spinner";
-import { buttonClassName, type ButtonVariant } from "./buttonClassName";
+import { buttonClassName, type ButtonSize, type ButtonVariant } from "./buttonClassName";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  size?: ButtonSize;
   // Shows a spinner and blocks further clicks while a request runs.
   isLoading?: boolean;
 }
@@ -13,6 +14,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // Form submit buttons must say type="submit".
 export default function Button({
   variant = "primary",
+  size = "md",
   isLoading = false,
   type = "button",
   disabled,
@@ -25,7 +27,7 @@ export default function Button({
       type={type}
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
-      className={buttonClassName(variant, className)}
+      className={buttonClassName(variant, className, size)}
       {...props}
     >
       {isLoading && <Spinner className="size-4" />}

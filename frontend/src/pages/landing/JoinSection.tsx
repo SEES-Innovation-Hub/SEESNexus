@@ -1,3 +1,4 @@
+import { buttonClassName } from "../../components/Button/buttonClassName";
 import PrefetchLink from "../../components/PrefetchLink";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -20,16 +21,10 @@ export function JoinSection() {
           and events.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
-          <PrefetchLink
-            to="/register"
-            className="rounded bg-sees-mint px-6 py-3 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow"
-          >
+          <PrefetchLink to="/register" className={buttonClassName("primary", "", "lg")}>
             Create an account
           </PrefetchLink>
-          <PrefetchLink
-            to="/login"
-            className="rounded border border-sees-teal px-6 py-3 font-medium text-sees-mint hover:border-sees-mint"
-          >
+          <PrefetchLink to="/login" className={buttonClassName("secondary", "", "lg")}>
             Log in
           </PrefetchLink>
         </div>

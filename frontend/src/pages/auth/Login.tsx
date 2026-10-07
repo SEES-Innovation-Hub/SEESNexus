@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { errorMessage } from "../../api/client";
+import Button from "../../components/Button";
+import Card from "../../components/Card";
 import PrefetchLink from "../../components/PrefetchLink";
 import TextField from "../../components/TextField";
 import { useAuth } from "../../hooks/useAuth";
@@ -32,45 +34,40 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded-2xl border border-sees-teal/40 bg-gradient-card p-8 shadow-sees-card"
-      >
-        <h1 className="text-2xl font-semibold text-sees-mint">Log in</h1>
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+      <Card padding="lg" className="w-full max-w-sm">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <h1 className="text-2xl font-semibold text-sees-mint">Log in</h1>
 
-        <TextField
-          id="email"
-          label="Email"
-          type="email"
-          value={email}
-          onChange={setEmail}
-        />
-        <TextField
-          id="password"
-          label="Password"
-          type="password"
-          value={password}
-          onChange={setPassword}
-        />
+          <TextField
+            id="email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={setEmail}
+          />
+          <TextField
+            id="password"
+            label="Password"
+            type="password"
+            value={password}
+            onChange={setPassword}
+          />
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full rounded bg-sees-mint py-2.5 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow disabled:opacity-50"
-        >
-          {isSubmitting ? "Logging in…" : "Log in"}
-        </button>
+          <Button type="submit" isLoading={isSubmitting} className="w-full">
+            {isSubmitting ? "Logging in…" : "Log in"}
+          </Button>
 
-        <p className="text-sm text-white/60">
-          No account?{" "}
-          <PrefetchLink to="/register" className="-my-3 inline-block py-3 text-sees-mustard underline hover:text-sees-mint">
-            Register
-          </PrefetchLink>
-        </p>
-      </form>
+          <p className="text-sm text-white/60">
+            No account?{" "}
+            <PrefetchLink to="/register" className="-my-3 inline-block py-3 text-sees-mustard underline hover:text-sees-mint">
+              Register
+            </PrefetchLink>
+          </p>
+        </form>
+      </Card>
     </div>
   );
 }

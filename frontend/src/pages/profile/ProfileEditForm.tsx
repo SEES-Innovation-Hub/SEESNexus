@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { errorMessage } from "../../api/client";
+import Button from "../../components/Button";
+import TextArea from "../../components/TextArea";
 import TextField from "../../components/TextField";
 import { useAuth } from "../../hooks/useAuth";
 import type { User, UserUpdatePayload } from "../../types/auth";
@@ -57,37 +59,17 @@ export function ProfileEditForm({ user, onDone }: ProfileEditFormProps) {
       <TextField id="department" label="Department" value={department} onChange={setDepartment} />
       <TextField id="level" label="Level" value={level} onChange={setLevel} required={false} />
 
-      <div>
-        <label htmlFor="bio" className="block text-sm font-medium text-sees-mint/80">
-          Bio
-        </label>
-        <textarea
-          id="bio"
-          rows={4}
-          value={bio}
-          onChange={(event) => setBio(event.target.value)}
-          className="mt-1 w-full rounded border border-sees-teal bg-sees-void/60 px-3 py-2.5 text-white placeholder:text-white/30 focus:border-sees-mint focus:outline-none focus:ring-1 focus:ring-sees-mint"
-        />
-      </div>
+      <TextArea id="bio" label="Bio" value={bio} onChange={setBio} />
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={isSaving}
-          className="flex-1 rounded bg-sees-mint py-2.5 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow disabled:opacity-50"
-        >
+        <Button type="submit" isLoading={isSaving} className="flex-1">
           {isSaving ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          disabled={isSaving}
-          className="flex-1 rounded border border-sees-teal py-2.5 font-medium text-sees-mint hover:border-sees-mint disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="secondary" onClick={onDone} disabled={isSaving} className="flex-1">
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

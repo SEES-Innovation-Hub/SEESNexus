@@ -1,12 +1,19 @@
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonSize = "md" | "lg";
 
-// min-h-11 = 44px, the touch-target size recommended for phones.
 // Hover effects use not-disabled:hover so a disabled button doesn't react to the
 // mouse (and links, which are never disabled, still do).
 // A loading button (aria-busy) is also disabled, but keeps its full colour: it is
 // busy, not unavailable. Only a truly disabled one turns grey (not-aria-busy).
 const baseStyles =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded px-4 font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sees-mint disabled:cursor-not-allowed aria-busy:cursor-wait";
+  "inline-flex items-center justify-center gap-2 rounded font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sees-mint disabled:cursor-not-allowed aria-busy:cursor-wait";
+
+// md: min-h-11 = 44px, the touch-target size recommended for phones.
+// lg: the bigger call-to-action buttons on Landing.
+const sizeStyles: Record<ButtonSize, string> = {
+  md: "min-h-11 px-4",
+  lg: "min-h-12 px-6",
+};
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
@@ -22,6 +29,6 @@ const variantStyles: Record<ButtonVariant, string> = {
 
 // The button look as a class string, for things that must stay links but should
 // look like buttons (e.g. a "Register" link): <PrefetchLink className={buttonClassName()} />.
-export function buttonClassName(variant: ButtonVariant = "primary", extra = "") {
-  return `${baseStyles} ${variantStyles[variant]} ${extra}`.trim();
+export function buttonClassName(variant: ButtonVariant = "primary", extra = "", size: ButtonSize = "md") {
+  return `${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${extra}`.trim();
 }
