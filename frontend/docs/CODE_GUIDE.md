@@ -46,19 +46,23 @@ src/
   context/
     AuthContext.ts             the context + its value type
     AuthProvider.tsx           session state and actions (login, logout, updateProfile)
+    ToastContext.ts / ToastProvider.tsx   the toast messages (showToast) and where they render
   hooks/
     useAuth.ts                 the only way components read the session
     useProjects.ts             Landing's project list (useQuery + a remembered copy)
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
+    useToast.ts                the only way components show a toast
   components/                  shared UI, one folder each, default export from index.tsx
-    TextField/  ProtectedRoute/  PrefetchLink/  ImageGenerator/
+    Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
+    Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
+    ProtectedRoute/  PrefetchLink/  ImageGenerator/      (see §3.10 for what each is for)
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail, ProjectCard,
                PillarsSection, TeamSection, JoinSection, LandingFooter
     auth/      Login, Register, OtpVerification
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
     notfound/  NotFound
-    dev/       ImageGeneratorPreview  (temporary sandbox, dev builds only)
+    dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
   utils/       redirectPathForRole, projectLabels
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
@@ -161,14 +165,33 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 
 `Landing` also calls `usePrefetchAuthPages()`. Project cards render only `http(s)` demo and GitHub links (the values are user-typed).
 
+### 3.10 Shared components
+All in `src/components/`, one folder each, default export. See every one of them, in every state, at **`/dev/components`** (dev builds only).
+
+| Component | Use it for | Notes |
+|---|---|---|
+| `Button` | Every button | Variants `primary` · `secondary` · `ghost` · `danger` (delete/reject only). `isLoading` shows a spinner and blocks clicks. **`type` defaults to `"button"`**, so form submit buttons must say `type="submit"`. |
+| `buttonClassName()` | A link that should look like a button | `<PrefetchLink className={buttonClassName("secondary")}>` |
+| `Card` | The glass panel | `as="article" \| "section" \| "li"`, `padding="none" \| "md" \| "lg"`. |
+| `Badge` | Status / category labels | Tones `mint` · `mustard` · `red` · `neutral`. Map values to tones next to their label map in `utils/`. |
+| `Spinner`, `Skeleton` | Loading | Skeleton is sized with `className` (`"h-6 w-40"`); the pulse stops under reduced motion. |
+| `EmptyState` | A list that loaded but is empty | `title`, optional `message` and `action`. |
+| `ErrorState` | Data that failed to load | Pass the query's `refetch` as `onRetry`. |
+| `Pagination` | Paginated lists | `page`, `totalPages` from the backend; hidden when there is one page. Under 360px only the arrows show. |
+| `Modal` | Any dialog | Native `<dialog>`: focus trap, Esc, focus return and the backdrop come from the browser. `dismissible={false}` while a request runs. Page scroll is locked in CSS (`index.css`). |
+| `ConfirmDialog` | "Are you sure?" before delete/reject | `isPending` spins the button and blocks closing. |
+| `TextField`, `TextArea`, `Select` | Form fields | Built on `Field` (label + hint + error). `error` turns the border red and is read out by screen readers. Optional fields are labelled "(optional)" automatically. |
+| `useToast().showToast(msg, tone?)` | Short feedback after an action | `"success"` (default) or `"error"`; fades after 5 s, max 3 at once. |
+
 ## 4. Every `useEffect` and why it exists
 
-The team rule is "justify every effect". There are exactly three, each with a comment in the code (API reads use `useQuery` instead of an effect, §3.4):
+The team rule is "justify every effect". There are exactly four, each with a comment in the code (API reads use `useQuery` instead of an effect, §3.4):
 
 | Where | Why it must be an effect |
 |---|---|
 | `AuthProvider` | On mount: restore a session from browser storage, and subscribe to the API client's session-expired signal — both are external systems. |
 | `usePrefetchAuthPages` | Wait for the browser's idle time — an external scheduler. |
+| `Modal` | Sync the `open` prop to the `<dialog>` element's `showModal()` / `close()` — a DOM API with no attribute equivalent for a modal. |
 | `ImageGenerator` | Revoke the preview's object URL when it changes or on unmount — an external resource that must also be cleaned up on unmount. |
 
 Everything else (form state, edit/view toggles, upload state) is plain state and event handlers.
@@ -177,6 +200,8 @@ Everything else (form state, edit/view toggles, upload state) is plain state and
 
 - **Components small and single-purpose** (all under the ~150–200 line guideline; the largest is `Register` at ~147). `Profile` and `Landing` are shells that compose focused pieces.
 - **Shared component = used on 2+ pages** (`TextField`, `PrefetchLink`, `ProtectedRoute`); otherwise it stays next to its page.
+- **Use the shared components** (§3.10) instead of re-typing their classes: no hand-written button, card or input styles in pages.
+- **Helpers live in their own `.ts` file** (`buttonClassName.ts`, `fieldStyles.ts`), not in a component file; React's fast refresh (and our lint rule) needs component files to export only components.
 - **Named exports for pages**, default exports for shared components.
 - **Responsive by default:** mobile-first Tailwind classes, breakpoints at `md` (768px); tap targets at least 44px (`min-h-11`); rail arrows tablet-and-up.
 - **Images:** `loading="lazy"`, `decoding="async"`, explicit `width`/`height` (Profile's avatar isn't lazy — it's at the top of its page).

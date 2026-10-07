@@ -12,6 +12,9 @@ import { pageLoaders } from "./routes/pageLoaders";
 const Login = lazy(() => pageLoaders.login().then((m) => ({ default: m.Login })));
 const Register = lazy(() => pageLoaders.register().then((m) => ({ default: m.Register })));
 const Profile = lazy(() => pageLoaders.profile().then((m) => ({ default: m.Profile })));
+const ComponentsPreview = lazy(() =>
+  import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
+);
 const ImageGeneratorPreview = lazy(() =>
   import("./pages/dev/ImageGeneratorPreview").then((m) => ({ default: m.ImageGeneratorPreview })),
 );
@@ -33,6 +36,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}
         {import.meta.env.DEV && (
           <Route
             path="/dev/image-generator"
