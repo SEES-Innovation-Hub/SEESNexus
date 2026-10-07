@@ -42,12 +42,13 @@ src/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
     projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
+    hardware.ts                listHardware, getHardware (public); requestLoan, listMyLoans, returnLoan
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
     tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
     upload.ts                  uploadImage (assumed /upload/image contract)
     imageGeneration.ts         generateImage (calls the image service directly)
-  types/                       hand-written types mirroring the backend schemas (auth, project, envelope)
+  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, envelope)
   context/
     AuthContext.ts             the context + its value type
     AuthProvider.tsx           session state and actions (login, logout, updateProfile)
@@ -58,6 +59,11 @@ src/
     useProjectList.ts          a page of projects with filters (Projects page)
     useProject.ts              one project (shows a list's copy instantly, §3.12)
     useCreateProject.ts / useUpdateProject.ts / useDeleteProject.ts   changes; each refreshes the lists
+    useUrlFilters.ts           filters + page in the address bar, shared by list pages (§3.13)
+    useHardwareList.ts         a page of hardware with filters
+    useMyLoans.ts              the signed-in person's loans (off for visitors)
+    useHardwareNames.ts        names of the items loans point to (temporary, §3.13)
+    useRequestLoan.ts / useReturnLoan.ts   loan actions
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
     useToast.ts                the only way components show a toast
     useModalDialog.ts          opens/closes a native <dialog> as a modal (Modal + the phone drawer)
@@ -72,9 +78,12 @@ src/
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
     projects/  ProjectsList, ProjectDetail, NewProject, EditProject, ProjectForm, TechStackInput,
                ProjectNotFound, projectFormValues (values, limits, validation)
+    hardware/  HardwareList, HardwareCard, LoanRequestModal, cardActionId
+    loans/     MyLoans, LoanCard
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
-  utils/       redirectPathForRole, projectLabels (labels, select options, URL checks), isHttpUrl, canEditProject
+  utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
+               isHttpUrl, canEditProject
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -228,7 +237,7 @@ AppLayout
 | `/projects/new` | signed in | `NewProject` → `ProjectForm` |
 | `/projects/:id/edit` | creator or admin | `EditProject` → `ProjectForm`; others see "You can't edit this project" |
 
-- **Filters and page live in the address bar** (`?category=IOT&status=COMPLETED&page=2`) via `useSearchParams`. Back/Forward and shared links work, and no effect syncs them. Unknown values (typed by hand) count as "no filter" (`isProjectCategory` / `isProjectStatus`). Changing a filter returns to page 1.
+- **Filters and page live in the address bar** (`?category=IOT&status=COMPLETED&page=2`) via `useUrlFilters` (§3.13). Back/Forward and shared links work, and no effect syncs them. Unknown values (typed by hand) count as "no filter" (`isProjectCategory` / `isProjectStatus`). Changing a filter returns to page 1.
 - **While the next page loads** the old cards stay, dimmed (`keepPreviousData`), instead of flashing to skeletons.
 - **Opening a project from a list is instant:** `useProject` uses the list's copy as placeholder data while the fresh record loads. `EditProject` waits for the fresh record, because the form copies its starting values once.
 - **Permissions** come from `utils/canEditProject.ts`, which mirrors the backend rule (creator or admin). The UI only hides what can't be done; the backend still decides.
@@ -237,6 +246,21 @@ AppLayout
 - **Members:** on create the creator is sent as the only member (`member_ids: [user.id]`). Edit never sends `member_ids`, so the backend keeps the team. A member picker needs a user-search endpoint the backend doesn't have yet.
 - **No thumbnail field** until `/upload/image` exists. Cards and the detail page show the category as a stand-in.
 - **After a change:** create/update put the new record straight into the detail cache and refresh every list. Delete removes the detail and refreshes the lists.
+
+### 3.13 Hardware and loans
+| Route | Who | Page |
+|---|---|---|
+| `/hardware` | anyone | `HardwareList`: category/availability filters, 12 per page; "Request loan" opens `LoanRequestModal` |
+| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected) |
+
+- **Shared list filters:** `useUrlFilters()` gives `page`, `read(name, guard)` (a value only counts if the guard recognises it), `setFilter` (returns to page 1), `setPage` (scrolls to the top) and `clearAll`. Projects and Hardware both use it.
+- **The card's action matches what the backend would allow:** your pending/approved loan → a link to My Loans. Under maintenance or none left → the reason, for everyone. Visitor → "Log in to borrow". Otherwise "Request loan". The backend refuses duplicates, maintenance items and empty shelves, so nobody fills in a request that's bound to fail.
+- **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once. `useReturnLoan` refreshes My Loans and the hardware lists.
+- **Focus after a request:** the card's button is replaced by a link, so the dialog can't return focus to it. `HardwareList` focuses the new link (`cardActionId`) two frames after closing. Cancelling still returns focus to the button the normal way.
+- **Return date:** optional, can't be before tomorrow, sent as the end of that day in the borrower's time zone.
+- **Loan names are a stopgap:** loans only carry `hardware_id`, so `useHardwareNames` fetches each distinct item once (cached for an hour). Remove it when the backend includes the name (DECISIONS open item 16).
+- **Overdue:** an approved loan past its due date gets a red "Overdue" badge.
+- **Not here:** adding, editing or retiring hardware and approving or rejecting loans are admin pages (Phase 3). There's no "cancel my request" endpoint.
 
 ## 4. Every `useEffect` and why it exists
 

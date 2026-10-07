@@ -1,0 +1,45 @@
+// Mirrors backend/app/schemas/hardware.py and models/hardware.py — keep in sync.
+export type HardwareCategory = "MEASUREMENT" | "MICROCONTROLLER" | "COMPONENT";
+export type HardwareStatus = "AVAILABLE" | "BORROWED" | "MAINTENANCE";
+export type LoanStatus = "PENDING" | "APPROVED" | "RETURNED" | "REJECTED";
+
+export interface Hardware {
+  id: string;
+  name: string;
+  description: string | null;
+  serial_number: string;
+  category: HardwareCategory;
+  status: HardwareStatus;
+  image_url: string | null;
+  quantity: number;
+  available_quantity: number;
+  added_by_id: string;
+}
+
+export interface PaginatedHardware {
+  items: Hardware[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
+// Dates are ISO strings; the ones still in the future are null.
+export interface Loan {
+  id: string;
+  hardware_id: string;
+  borrower_id: string;
+  approved_by_id: string | null;
+  status: LoanStatus;
+  purpose: string;
+  request_date: string | null;
+  approval_date: string | null;
+  expected_return_date: string | null;
+  actual_return_date: string | null;
+}
+
+// POST /hardware/:id/loan (LoanCreateRequest).
+export interface LoanRequestPayload {
+  purpose: string;
+  expected_return_date: string | null;
+}

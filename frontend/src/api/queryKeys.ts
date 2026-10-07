@@ -1,3 +1,4 @@
+import type { HardwareListParams } from "./hardware";
 import type { ProjectListParams } from "./projects";
 
 // Every cached API read is named here, so a screen that changes data can
@@ -11,5 +12,13 @@ export const queryKeys = {
     lists: ["projects", "list"] as const,
     list: (params: ProjectListParams) => ["projects", "list", params] as const,
     detail: (id: string) => ["projects", "detail", id] as const,
+  },
+  hardware: {
+    lists: ["hardware", "list"] as const,
+    list: (params: HardwareListParams) => ["hardware", "list", params] as const,
+    detail: (id: string) => ["hardware", "detail", id] as const,
+  },
+  loans: {
+    mine: ["loans", "mine"] as const,
   },
 };

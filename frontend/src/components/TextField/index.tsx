@@ -10,6 +10,8 @@ interface TextFieldProps extends Omit<FieldProps, "optional"> {
   maxLength?: number;
   placeholder?: string;
   autoComplete?: string;
+  // For type="date": the earliest date that can be picked (YYYY-MM-DD).
+  min?: string;
 }
 
 // Required by default; required={false} also labels the field "(optional)".

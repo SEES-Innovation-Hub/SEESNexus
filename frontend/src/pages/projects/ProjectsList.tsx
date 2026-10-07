@@ -1,5 +1,4 @@
 import { Plus } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
 import { buttonClassName } from "../../components/Button/buttonClassName";
 import Button from "../../components/Button";
 import EmptyState from "../../components/EmptyState";
@@ -11,6 +10,7 @@ import Select from "../../components/Select";
 import Skeleton from "../../components/Skeleton";
 import { useAuth } from "../../hooks/useAuth";
 import { useProjectList } from "../../hooks/useProjectList";
+import { useUrlFilters } from "../../hooks/useUrlFilters";
 import {
   CATEGORY_OPTIONS,
   STATUS_OPTIONS,
@@ -20,17 +20,11 @@ import {
 
 const PAGE_SIZE = 12;
 
-// Filters and the page number live in the address bar (?category=IOT&page=2),
-// so Back/Forward and shared links work and no effect is needed to sync them.
 export function ProjectsList() {
   const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const categoryParam = searchParams.get("category");
-  const statusParam = searchParams.get("status");
-  const category = isProjectCategory(categoryParam) ? categoryParam : undefined;
-  const status = isProjectStatus(statusParam) ? statusParam : undefined;
-  const page = Math.max(1, Math.floor(Number(searchParams.get("page"))) || 1);
-  const isFiltered = category !== undefined || status !== undefined || page > 1;
+  const { page, isFiltered, read, setFilter, setPage, clearAll } = useUrlFilters();
+  const category = read("category", isProjectCategory);
+  const status = read("status", isProjectStatus);
 
   const { data, isPending, isError, isFetching, isPlaceholderData, refetch } = useProjectList({
     page,
@@ -38,20 +32,6 @@ export function ProjectsList() {
     category,
     status,
   });
-
-  // Changing a filter starts again from page 1.
-  function setParam(name: "category" | "status" | "page", value: string) {
-    const next = new URLSearchParams(searchParams);
-    if (value) next.set(name, value);
-    else next.delete(name);
-    if (name !== "page") next.delete("page");
-    setSearchParams(next);
-  }
-
-  function goToPage(nextPage: number) {
-    setParam("page", nextPage > 1 ? String(nextPage) : "");
-    window.scrollTo({ top: 0 });
-  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -80,7 +60,7 @@ export function ProjectsList() {
           id="filter-category"
           label="Category"
           value={category ?? ""}
-          onChange={(value) => setParam("category", value)}
+          onChange={(value) => setFilter("category", value)}
           options={CATEGORY_OPTIONS}
           placeholder="All categories"
           required={false}
@@ -89,7 +69,7 @@ export function ProjectsList() {
           id="filter-status"
           label="Status"
           value={status ?? ""}
-          onChange={(value) => setParam("status", value)}
+          onChange={(value) => setFilter("status", value)}
           options={STATUS_OPTIONS}
           placeholder="All statuses"
           required={false}
@@ -112,7 +92,7 @@ export function ProjectsList() {
             title="No projects here"
             message="Nothing matches these filters."
             action={
-              <Button variant="secondary" onClick={() => setSearchParams({})}>
+              <Button variant="secondary" onClick={clearAll}>
                 Show all projects
               </Button>
             }
@@ -145,7 +125,7 @@ export function ProjectsList() {
               </li>
             ))}
           </ul>
-          <Pagination page={page} totalPages={data.total_pages} onPageChange={goToPage} />
+          <Pagination page={page} totalPages={data.total_pages} onPageChange={setPage} />
         </>
       )}
     </div>

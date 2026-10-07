@@ -17,6 +17,8 @@ const ProjectsList = lazy(() => pageLoaders.projectsList().then((m) => ({ defaul
 const ProjectDetail = lazy(() => pageLoaders.projectDetail().then((m) => ({ default: m.ProjectDetail })));
 const NewProject = lazy(() => pageLoaders.newProject().then((m) => ({ default: m.NewProject })));
 const EditProject = lazy(() => pageLoaders.editProject().then((m) => ({ default: m.EditProject })));
+const HardwareList = lazy(() => pageLoaders.hardwareList().then((m) => ({ default: m.HardwareList })));
+const MyLoans = lazy(() => pageLoaders.myLoans().then((m) => ({ default: m.MyLoans })));
 const ComponentsPreview = lazy(() =>
   import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
 );
@@ -52,6 +54,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <EditProject />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/hardware" element={<HardwareList />} />
+          <Route
+            path="/loans"
+            element={
+              <ProtectedRoute>
+                <MyLoans />
               </ProtectedRoute>
             }
           />
