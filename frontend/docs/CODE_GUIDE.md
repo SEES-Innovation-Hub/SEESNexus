@@ -315,7 +315,9 @@ Everything else (form state, edit/view toggles, upload state) is plain state and
 - **Use the shared components** (§3.10) instead of re-typing their classes: no hand-written button, card or input styles in pages.
 - **Helpers live in their own `.ts` file** (`buttonClassName.ts`, `fieldStyles.ts`), not in a component file; React's fast refresh (and our lint rule) needs component files to export only components.
 - **Named exports for pages**, default exports for shared components.
-- **Responsive by default:** mobile-first Tailwind classes, breakpoints at `md` (768px); tap targets at least 44px (`min-h-11`); rail arrows tablet-and-up.
+- **Responsive by default:** mobile-first Tailwind classes (`sm` 640, `md` 768, `lg` 1024 where the sidebar appears); tap targets at least 44px (`min-h-11`); rail arrows tablet-and-up. The only exception is the laptop sidebar, which uses 40px links **only with a mouse** (`lg:pointer-fine:min-h-10`), so a tablet held sideways keeps 44px.
+- **Form fields use 16px text** (the default). Below that, iPhones zoom the page when a field is tapped; the responsive audit checks it.
+- **Scrollbars and native controls follow the theme:** `color-scheme: dark` and thin mint scrollbars are set once in `index.css`. Don't style scrollbars per component.
 - **Images:** `loading="lazy"`, `decoding="async"`, explicit `width`/`height` (Profile's avatar isn't lazy — it's at the top of its page).
 - **No blur on cards, no `background-attachment: fixed`** (measured to cost real frame time on phones).
 - **Untrusted URLs** from the database are only linked if they start with `http://` or `https://`.

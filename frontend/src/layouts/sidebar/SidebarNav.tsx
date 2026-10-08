@@ -9,8 +9,11 @@ interface SidebarNavProps {
   onNavigate?: () => void;
 }
 
+// 44px links for touch; 40px only on a laptop-width screen used with a mouse
+// (pointer-fine), so nine links fit without scrolling. A tablet held sideways
+// is laptop-width but touch, and keeps 44px.
 const linkBase =
-  "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors";
+  "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors lg:pointer-fine:min-h-10";
 
 export function SidebarNav({ collapsed, onNavigate }: SidebarNavProps) {
   const { user } = useAuth();
@@ -18,7 +21,7 @@ export function SidebarNav({ collapsed, onNavigate }: SidebarNavProps) {
   const groups = navGroups.filter((group) => !group.adminOnly || isAdmin);
 
   return (
-    <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+    <nav aria-label="Main" className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
       {groups.map((group) => (
         <div key={group.label}>
           <p

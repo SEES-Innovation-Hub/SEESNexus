@@ -50,14 +50,14 @@ export function AdminLoans() {
       </div>
 
       {/* The view lives in the address bar (?view=active), so it survives a refresh. */}
-      <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
+      <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5 sm:gap-2">
         {(Object.keys(VIEWS) as View[]).map((key) => (
           <button
             key={key}
             type="button"
             aria-pressed={view === key}
             onClick={() => setFilter("view", key === "pending" ? "" : key)}
-            className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors ${
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors sm:gap-2 sm:px-4 ${
               view === key
                 ? "border-sees-mint bg-sees-mint/10 text-sees-mint"
                 : "border-sees-teal text-white/70 hover:border-sees-mint/60 hover:text-white"

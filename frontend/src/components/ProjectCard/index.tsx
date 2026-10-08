@@ -58,9 +58,12 @@ export default function ProjectCard({ project }: { project: Project }) {
           className="aspect-video w-full object-cover"
         />
       ) : (
+        // Without a thumbnail (every project until uploads exist) a phone gets a
+        // slim banner instead of a tall empty box; wider screens keep the
+        // picture's shape so cards in a row line up.
         <div
           aria-hidden="true"
-          className="flex aspect-video w-full items-center justify-center bg-sees-glass font-mono text-sm text-sees-mint/60"
+          className="flex h-20 w-full items-center justify-center bg-sees-glass font-mono text-sm text-sees-mint/60 sm:aspect-video sm:h-auto"
         >
           {CATEGORY_LABELS[project.category]}
         </div>
