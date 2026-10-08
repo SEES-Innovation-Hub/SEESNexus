@@ -1,9 +1,21 @@
-import { ArrowLeftRight, Cpu, FolderKanban, UserRound, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ClipboardCheck,
+  Cpu,
+  FolderKanban,
+  LayoutDashboard,
+  ShieldCheck,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
 
 export interface NavItem {
   label: string;
   to: string;
   icon: LucideIcon;
+  // Highlight only on this exact address, not on pages below it (/admin must
+  // not stay highlighted on /admin/loans).
+  exact?: boolean;
 }
 
 export interface NavGroup {
@@ -16,15 +28,24 @@ export interface NavGroup {
 // Every link in the sidebar. Add a link here only once its page exists, so
 // nobody can click into a "Page not found". Planned, in order:
 //   General: Events (Phase 4)
-//   Admin:   Overview, Users, Loan requests, Hardware, Projects (Phase 3)
+//   Admin:   Users, Hardware inventory (Phase 3, step B)
 export const navGroups: NavGroup[] = [
   {
     label: "General",
     items: [
+      { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
       { label: "Projects", to: "/projects", icon: FolderKanban },
       { label: "Hardware", to: "/hardware", icon: Cpu },
       { label: "My Loans", to: "/loans", icon: ArrowLeftRight },
       { label: "Profile", to: "/profile", icon: UserRound },
+    ],
+  },
+  {
+    label: "Admin",
+    adminOnly: true,
+    items: [
+      { label: "Overview", to: "/admin", icon: ShieldCheck, exact: true },
+      { label: "Loan requests", to: "/admin/loans", icon: ClipboardCheck },
     ],
   },
 ];

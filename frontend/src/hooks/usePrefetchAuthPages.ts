@@ -16,7 +16,7 @@ function isDataSaverOn(): boolean {
   return connection?.saveData === true
 }
 
-// Downloads the login/register code, and the Projects page members land on,
+// Downloads the login/register code, and the Dashboard members land on,
 // while the browser is idle after the page has loaded, so tapping "Log in" doesn't wait for a download. Skipped for
 // visitors with data saver on; they still get the hover/touch prefetch on links.
 export function usePrefetchAuthPages() {
@@ -24,6 +24,6 @@ export function usePrefetchAuthPages() {
   // so this can't be render-time or event-handler logic.
   useEffect(() => {
     if (isDataSaverOn()) return
-    return whenIdle(() => prefetchPages('login', 'register', 'projectsList'))
+    return whenIdle(() => prefetchPages('login', 'register', 'dashboard'))
   }, [])
 }

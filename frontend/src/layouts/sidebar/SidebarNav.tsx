@@ -27,11 +27,12 @@ export function SidebarNav({ collapsed, onNavigate }: SidebarNavProps) {
             {group.label}
           </p>
           <ul className="space-y-1">
-            {group.items.map(({ label, to, icon: Icon }) => (
+            {group.items.map(({ label, to, icon: Icon, exact }) => (
               <li key={to}>
                 {/* NavLink sets aria-current="page" on the link for the open page. */}
                 <NavLink
                   to={to}
+                  end={exact}
                   onClick={onNavigate}
                   title={collapsed ? label : undefined}
                   className={({ isActive }) =>

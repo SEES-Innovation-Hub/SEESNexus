@@ -13,6 +13,9 @@ export const pageLoaders = {
   editProject: () => import("../pages/projects/EditProject"),
   hardwareList: () => import("../pages/hardware/HardwareList"),
   myLoans: () => import("../pages/loans/MyLoans"),
+  dashboard: () => import("../pages/dashboard/Dashboard"),
+  adminOverview: () => import("../pages/admin/AdminOverview"),
+  adminLoans: () => import("../pages/admin/AdminLoans"),
 };
 
 export type PageName = keyof typeof pageLoaders;
@@ -25,6 +28,9 @@ const PAGE_FOR_PATH: Record<string, PageName> = {
   "/projects/new": "newProject",
   "/hardware": "hardwareList",
   "/loans": "myLoans",
+  "/dashboard": "dashboard",
+  "/admin": "adminOverview",
+  "/admin/loans": "adminLoans",
 };
 
 // Paths with an id in them, checked when there is no exact match above.
@@ -43,6 +49,9 @@ const LAYOUT_PAGES: ReadonlySet<PageName> = new Set([
   "editProject",
   "hardwareList",
   "myLoans",
+  "dashboard",
+  "adminOverview",
+  "adminLoans",
 ]);
 
 export function prefetchPages(...names: PageName[]) {

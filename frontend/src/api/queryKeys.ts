@@ -21,4 +21,9 @@ export const queryKeys = {
   loans: {
     mine: ["loans", "mine"] as const,
   },
+  admin: {
+    stats: ["admin", "stats"] as const,
+    users: ["admin", "users"] as const,
+    loans: ["admin", "loans"] as const,
+  },
 };

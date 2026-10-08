@@ -43,12 +43,13 @@ src/
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
     projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
     hardware.ts                listHardware, getHardware (public); requestLoan, listMyLoans, returnLoan
+    admin.ts                   getAdminStats, listUsers, changeUserRole, deactivateUser, listAllLoans, approveLoan, rejectLoan
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
     tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
     upload.ts                  uploadImage (assumed /upload/image contract)
     imageGeneration.ts         generateImage (calls the image service directly)
-  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, envelope)
+  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, admin, envelope)
   context/
     AuthContext.ts             the context + its value type
     AuthProvider.tsx           session state and actions (login, logout, updateProfile)
@@ -65,13 +66,16 @@ src/
     useMyLoans.ts              the signed-in person's loans (off for visitors)
     useHardwareNames.ts        names of the items loans point to (temporary, §3.13)
     useRequestLoan.ts / useReturnLoan.ts   loan actions
+    useAdminStats.ts / useAdminLoans.ts / useAdminUsers.ts   admin reads
+    useAdminLoanList.ts        all loans joined with borrower (user list) and item names
+    useApproveLoan.ts / useRejectLoan.ts   admin decisions
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
     useToast.ts                the only way components show a toast
     useModalDialog.ts          opens/closes a native <dialog> as a modal (Modal + the phone drawer)
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/   (see §3.10)
+    Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/  StatTile/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail,
                PillarsSection, TeamSection, JoinSection, LandingFooter
@@ -81,10 +85,12 @@ src/
                ProjectNotFound, projectFormValues (values, limits, validation)
     hardware/  HardwareList, HardwareCard, LoanRequestModal, cardActionId
     loans/     MyLoans, LoanCard
+    dashboard/ Dashboard, DashboardLoans, LatestProjects
+    admin/     AdminOverview, AdminLoans, AdminLoanCard
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
   utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
-               isHttpUrl, canEditProject, returnPath
+               isHttpUrl, canEditProject, returnPath, isOverdue, loanDates, waitingQueue
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -108,7 +114,7 @@ Errors: `errorMessage(error, "fallback text")` returns the backend's own message
 
 ### 3.2 The session (`AuthProvider` + `client.ts`)
 - **On app start**, if a token is stored (read through `tokenStore`), `AuthProvider` calls `GET /auth/me`. While that runs `isLoading` is true, so `ProtectedRoute` waits instead of redirecting a signed-in user.
-- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. It goes to the page the person wanted (`returnPath`, see §3.11) or else their home, `redirectPathForRole` (Projects for every role until the Phase 3 Dashboard).
+- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. It goes to the page the person wanted (`returnPath`, see §3.11) or else their home, `redirectPathForRole` (`/dashboard` for members, `/admin` for admins).
 - **Who sees what:** visitors get only Landing, `/login` and `/register`. `GuestRoute` sends a signed-in member away from those three to their home, so they never see Landing again until they log out. Every app page sits inside one `ProtectedRoute`.
 - **Log out** (`useLogout()`) clears the tokens and records the page it was pressed on (`loggedOutAt` = that page's `location.key`). `ProtectedRoute` sends exactly that page to Landing. Any later visit to an app page (a showcase card, Back) goes to login as usual. Keying it to one history entry, rather than a flag that stays on, is what stops "after logging out, clicking a project bounces back to Landing".
 - **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
@@ -207,6 +213,7 @@ All in `src/components/`, one folder each, default export. See every one of them
 | `Avatar` | A person's photo or initial | `name`, `imageUrl`, `size` (px). Decorative: put the name next to it. |
 | `AdminRoute` | Wrapping admin-only pages | Not signed in → `/login`; not an admin → their own start page. The backend enforces the real rule. |
 | `ProjectCard` | A project in a list | The whole card links to the project; the parent sets its width (rail: fixed, Projects page: grid column). |
+| `StatTile` | One headline number | `label`, `value` (compact: 12.9K), optional `detail` and `to` (whole tile links). Numbers always come from the API. |
 | `useToast().showToast(msg, tone?)` | Short feedback after an action | `"success"` (default) or `"error"`; fades after 5 s, max 3 at once. |
 
 ### 3.11 The signed-in layout (sidebar)
@@ -264,6 +271,19 @@ AppLayout
 - **Loan names are a stopgap:** loans only carry `hardware_id`, so `useHardwareNames` fetches each distinct item once (cached for an hour). Remove it when the backend includes the name (DECISIONS open item 16).
 - **Overdue:** an approved loan past its due date gets a red "Overdue" badge.
 - **Not here:** adding, editing or retiring hardware and approving or rejecting loans are admin pages (Phase 3). There's no "cancel my request" endpoint.
+
+### 3.14 Dashboard and admin
+| Route | Who | Page |
+|---|---|---|
+| `/dashboard` | members (their home) | Greeting, quick actions, `DashboardLoans` (current loans, overdue first), `LatestProjects` (3 newest). Each section loads on its own. |
+| `/admin` | admins (their home) | `AdminOverview`: four `StatTile`s from `GET /admin/dashboard`, then the 3 oldest waiting requests |
+| `/admin/loans` | admins | `AdminLoans`: Waiting / On loan / History / All (`?view=` in the URL), each loan as `AdminLoanCard` |
+
+- **Admin pages** sit in one nested route wrapped in `AdminRoute` (`<AdminRoute><Outlet/></AdminRoute>`). Students who open them are sent to their Dashboard. Each admin page is its own chunk, so students never download it.
+- **Who and what:** a loan carries only ids, so `useAdminLoanList` joins it with `/admin/users` (borrower name, email, department, level) and `useHardwareNames` (item name).
+- **Order:** waiting requests oldest first (`waitingQueue`, first come, first served), loans out now overdue first, history newest first.
+- **Decisions:** Approve needs no confirmation; Reject asks first. A failed approval (e.g. "No units available to lend" when the last unit already went out) is shown as an error toast and the request stays in the queue. After any decision the loans, the stats and (for approvals) hardware availability refresh.
+- **Sidebar:** "Admin" group (Overview, Loan requests) for admins only. Overview uses `exact` so it isn't highlighted on `/admin/loans`.
 
 ## 4. Every `useEffect` and why it exists
 
