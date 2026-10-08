@@ -1,5 +1,4 @@
 import Badge from "../../components/Badge";
-import Button from "../../components/Button";
 import Card from "../../components/Card";
 import type { Loan } from "../../types/hardware";
 import { LOAN_STATUS_LABELS, LOAN_STATUS_TONES } from "../../utils/hardwareLabels";
@@ -10,10 +9,9 @@ interface LoanCardProps {
   loan: Loan;
   // undefined while the item's name is still being looked up.
   hardwareName: string | undefined;
-  onReturn: () => void;
 }
 
-export function LoanCard({ loan, hardwareName, onReturn }: LoanCardProps) {
+export function LoanCard({ loan, hardwareName }: LoanCardProps) {
   return (
     <Card as="article" className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -27,10 +25,10 @@ export function LoanCard({ loan, hardwareName, onReturn }: LoanCardProps) {
       </div>
       <p className="text-sm wrap-anywhere whitespace-pre-line text-white/70">{loan.purpose}</p>
       <p className="text-xs text-white/50">{loanDateSummary(loan)}</p>
+      {/* Students can't mark a loan returned themselves: an admin checks the
+          item back in once it's physically at the lab. */}
       {loan.status === "APPROVED" && (
-        <Button variant="secondary" onClick={onReturn}>
-          Mark as returned
-        </Button>
+        <p className="text-sm text-sees-mustard">Bring it back to the lab. An admin will check it in.</p>
       )}
     </Card>
   );

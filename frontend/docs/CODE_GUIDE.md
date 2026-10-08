@@ -42,7 +42,7 @@ src/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
     projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
-    hardware.ts                listHardware, getHardware (public); requestLoan, listMyLoans, returnLoan
+    hardware.ts                listHardware, getHardware (public); requestLoan, listMyLoans (no self-return, §3.13)
     admin.ts                   getAdminStats, listUsers, changeUserRole, deactivateUser, listAllLoans, approveLoan, rejectLoan
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
@@ -65,7 +65,7 @@ src/
     useHardwareList.ts         a page of hardware with filters
     useMyLoans.ts              the signed-in person's loans (off for visitors)
     useHardwareNames.ts        names of the items loans point to (temporary, §3.13)
-    useRequestLoan.ts / useReturnLoan.ts   loan actions
+    useRequestLoan.ts          the loan request action
     useAdminStats.ts / useAdminLoans.ts / useAdminUsers.ts   admin reads
     useAdminLoanList.ts        all loans joined with borrower (user list) and item names
     useApproveLoan.ts / useRejectLoan.ts   admin decisions
@@ -173,7 +173,7 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 ```
 - `verify-code` **uses the code up**, and `register` only accepts an already-used code. That is why a failure at the register step sends the user back to the details form to request a fresh code, instead of leaving them on the OTP screen.
 - `Register` owns the state (`details`, `step`, `error`, `isSubmitting`); `OtpVerification` only shows the second screen.
-- **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate by role (ADMIN to `/admin`, everyone else to `/profile`).
+- **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate: to the page they wanted, or their home (`/admin` for admins, `/dashboard` for everyone else).
 - Both the login submit and the register "code verified" handler call `prefetchPages("profile")` first, so the Profile code downloads while the request runs.
 
 ### 3.8 Profile view and edit
@@ -261,11 +261,12 @@ AppLayout
 | Route | Who | Page |
 |---|---|---|
 | `/hardware` | signed in | `HardwareList`: category/availability filters, 12 per page; "Request loan" opens `LoanRequestModal` |
-| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected) |
+| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected). No return button: see below |
 
 - **Shared list filters:** `useUrlFilters()` gives `page`, `read(name, guard)` (a value only counts if the guard recognises it), `setFilter` (returns to page 1), `setPage` (scrolls to the top) and `clearAll`. Projects and Hardware both use it.
 - **The card's action matches what the backend would allow:** your pending/approved loan → a link to My Loans. Under maintenance or none left → the reason. Otherwise "Request loan". The backend refuses duplicates, maintenance items and empty shelves, so nobody fills in a request that's bound to fail.
-- **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once. `useReturnLoan` refreshes My Loans and the hardware lists.
+- **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once.
+- **Students can't mark a loan returned.** The backend's `PUT /hardware/loans/:id/return` lets the *borrower* close a loan, so anyone could "return" something still in their bag and free up a unit that isn't on the shelf. The website doesn't use it. An approved loan shows "Bring it back to the lab. An admin will check it in." Returns will be confirmed by an admin, once the backend has an admin return endpoint (DECISIONS open item 20).
 - **Focus after a request:** the card's button is replaced by a link, so the dialog can't return focus to it. `HardwareList` focuses the new link (`cardActionId`) two frames after closing. Cancelling still returns focus to the button the normal way.
 - **Return date:** optional, can't be before tomorrow, sent as the end of that day in the borrower's time zone.
 - **Loan names are a stopgap:** loans only carry `hardware_id`, so `useHardwareNames` fetches each distinct item once (cached for an hour). Remove it when the backend includes the name (DECISIONS open item 16).

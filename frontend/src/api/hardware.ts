@@ -38,7 +38,7 @@ export function listMyLoans() {
   return unwrap<Loan[]>(api.get("/hardware/loans/my"));
 }
 
-// The borrower only, and only for an APPROVED loan.
-export function returnLoan(loanId: string) {
-  return unwrap<Loan>(api.put(`/hardware/loans/${loanId}/return`));
-}
+// Not used on purpose: PUT /hardware/loans/:id/return lets the BORROWER mark a
+// loan returned, so a student could "return" an item they still have. Returns
+// are to be confirmed by an admin who has the item in hand, once the backend
+// adds that endpoint (DECISIONS open item 20).
