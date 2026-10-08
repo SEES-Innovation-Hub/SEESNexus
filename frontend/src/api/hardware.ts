@@ -2,6 +2,7 @@ import { api, unwrap } from "./client";
 import type {
   Hardware,
   HardwareCategory,
+  HardwarePayload,
   HardwareStatus,
   Loan,
   LoanRequestPayload,
@@ -26,6 +27,22 @@ export function listHardware({ page, pageSize, category, status }: HardwareListP
 // Public endpoint.
 export function getHardware(id: string) {
   return unwrap<Hardware>(api.get(`/hardware/${id}`));
+}
+
+// Admin only. A new item starts with every unit available.
+export function createHardware(payload: HardwarePayload) {
+  return unwrap<Hardware>(api.post("/hardware", payload));
+}
+
+// Admin only. Lowering quantity below the units out on loan is refused (400).
+export function updateHardware(id: string, payload: Partial<HardwarePayload>) {
+  return unwrap<Hardware>(api.put(`/hardware/${id}`, payload));
+}
+
+// Admin only. Soft delete: the item is set to MAINTENANCE and can't be borrowed;
+// its loan history is kept. updateHardware with a status puts it back.
+export function retireHardware(id: string) {
+  return unwrap<Hardware>(api.delete(`/hardware/${id}`));
 }
 
 // Signed in. Creates a PENDING loan; units only leave the shelf when an admin approves.

@@ -1,11 +1,13 @@
 import {
   ArrowLeftRight,
+  Boxes,
   ClipboardCheck,
   Cpu,
   FolderKanban,
   LayoutDashboard,
   ShieldCheck,
   UserRound,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,7 +30,6 @@ export interface NavGroup {
 // Every link in the sidebar. Add a link here only once its page exists, so
 // nobody can click into a "Page not found". Planned, in order:
 //   General: Events (Phase 4)
-//   Admin:   Users, Hardware inventory (Phase 3, step B)
 export const navGroups: NavGroup[] = [
   {
     label: "General",
@@ -46,6 +47,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "Overview", to: "/admin", icon: ShieldCheck, exact: true },
       { label: "Loan requests", to: "/admin/loans", icon: ClipboardCheck },
+      { label: "Members", to: "/admin/users", icon: Users },
+      { label: "Inventory", to: "/admin/hardware", icon: Boxes },
     ],
   },
 ];

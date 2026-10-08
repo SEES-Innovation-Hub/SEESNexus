@@ -42,7 +42,8 @@ src/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
     projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
-    hardware.ts                listHardware, getHardware (public); requestLoan, listMyLoans (no self-return, §3.13)
+    hardware.ts                listHardware, getHardware; requestLoan, listMyLoans (no self-return, §3.13);
+                               createHardware, updateHardware, retireHardware (admin)
     admin.ts                   getAdminStats, listUsers, changeUserRole, deactivateUser, listAllLoans, approveLoan, rejectLoan
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
@@ -69,6 +70,8 @@ src/
     useAdminStats.ts / useAdminLoans.ts / useAdminUsers.ts   admin reads
     useAdminLoanList.ts        all loans joined with borrower (user list) and item names
     useApproveLoan.ts / useRejectLoan.ts   admin decisions
+    useChangeUserRole.ts / useDeactivateUser.ts   member management
+    useCreateHardware.ts / useUpdateHardware.ts / useRetireHardware.ts   inventory management
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
     useToast.ts                the only way components show a toast
     useModalDialog.ts          opens/closes a native <dialog> as a modal (Modal + the phone drawer)
@@ -86,11 +89,12 @@ src/
     hardware/  HardwareList, HardwareCard, LoanRequestModal, cardActionId
     loans/     MyLoans, LoanCard
     dashboard/ Dashboard, DashboardLoans, LatestProjects
-    admin/     AdminOverview, AdminLoans, AdminLoanCard
+    admin/     AdminOverview, AdminLoans, AdminLoanCard, AdminUsers, UserRow,
+               AdminHardware, AdminHardwareRow, HardwareFormModal, hardwareFormValues
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
   utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
-               isHttpUrl, canEditProject, returnPath, isOverdue, loanDates, waitingQueue
+               isHttpUrl, canEditProject, returnPath, isOverdue, loanDates, waitingQueue, userLabels
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -279,12 +283,16 @@ AppLayout
 | `/dashboard` | members (their home) | Greeting, quick actions, `DashboardLoans` (current loans, overdue first), `LatestProjects` (3 newest). Each section loads on its own. |
 | `/admin` | admins (their home) | `AdminOverview`: four `StatTile`s from `GET /admin/dashboard`, then the 3 oldest waiting requests |
 | `/admin/loans` | admins | `AdminLoans`: Waiting / On loan / History / All (`?view=` in the URL), each loan as `AdminLoanCard` |
+| `/admin/users` | admins | `AdminUsers`: search (name, email, department) and role filter, each member as `UserRow` |
+| `/admin/hardware` | admins | `AdminHardware`: inventory with filters and paging; Add/Edit in `HardwareFormModal`; Retire / Back in service per `AdminHardwareRow` |
 
 - **Admin pages** sit in one nested route wrapped in `AdminRoute` (`<AdminRoute><Outlet/></AdminRoute>`). Students who open them are sent to their Dashboard. Each admin page is its own chunk, so students never download it.
 - **Who and what:** a loan carries only ids, so `useAdminLoanList` joins it with `/admin/users` (borrower name, email, department, level) and `useHardwareNames` (item name).
 - **Order:** waiting requests oldest first (`waitingQueue`, first come, first served), loans out now overdue first, history newest first.
 - **Decisions:** Approve needs no confirmation; Reject asks first. A failed approval (e.g. "No units available to lend" when the last unit already went out) is shown as an error toast and the request stays in the queue. After any decision the loans, the stats and (for approvals) hardware availability refresh.
-- **Sidebar:** "Admin" group (Overview, Loan requests) for admins only. Overview uses `exact` so it isn't highlighted on `/admin/loans`.
+- **Members:** the backend sends every account (no paging/search), so search and the role filter run in the browser, in local state (typing into the URL would add a history entry per keystroke). Changing a role picks it in the dropdown, then asks for confirmation (with a warning when making someone an admin). Deactivating warns it can't be undone from the website yet. **The admin's own row has no controls**, because the backend doesn't stop admins demoting or deactivating themselves. Deactivated members show a badge and lose their controls.
+- **Inventory:** the form validates against the backend limits. Quantity can't go below the units out on loan (the form says how many). Backend errors such as a duplicate serial number appear inside the form. **Retire** is the backend's soft delete (status MAINTENANCE, history kept), so it can be undone: **Back in service** sets the status the stock implies (AVAILABLE, or BORROWED if every unit is out). There's no status field in the form; those two buttons are the only way to change it.
+- **Sidebar:** "Admin" group (Overview, Loan requests, Members, Inventory) for admins only. Overview uses `exact` so it isn't highlighted on `/admin/loans`.
 
 ## 4. Every `useEffect` and why it exists
 

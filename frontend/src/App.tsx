@@ -24,6 +24,8 @@ const MyLoans = lazy(() => pageLoaders.myLoans().then((m) => ({ default: m.MyLoa
 const Dashboard = lazy(() => pageLoaders.dashboard().then((m) => ({ default: m.Dashboard })));
 const AdminOverview = lazy(() => pageLoaders.adminOverview().then((m) => ({ default: m.AdminOverview })));
 const AdminLoans = lazy(() => pageLoaders.adminLoans().then((m) => ({ default: m.AdminLoans })));
+const AdminUsers = lazy(() => pageLoaders.adminUsers().then((m) => ({ default: m.AdminUsers })));
+const AdminHardware = lazy(() => pageLoaders.adminHardware().then((m) => ({ default: m.AdminHardware })));
 const ComponentsPreview = lazy(() =>
   import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
 );
@@ -88,6 +90,8 @@ function App() {
           >
             <Route path="/admin" element={<AdminOverview />} />
             <Route path="/admin/loans" element={<AdminLoans />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/hardware" element={<AdminHardware />} />
           </Route>
         </Route>
         {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}

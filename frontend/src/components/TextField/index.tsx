@@ -10,11 +10,12 @@ interface TextFieldProps extends Omit<FieldProps, "optional"> {
   maxLength?: number;
   placeholder?: string;
   autoComplete?: string;
-  // For type="date": the earliest date that can be picked (YYYY-MM-DD).
+  // For type="date" or "number": the lowest value allowed (YYYY-MM-DD or a number).
   min?: string;
 }
 
-// Required by default; required={false} also labels the field "(optional)".
+// Required by default; required={false} also labels the field "(optional)"
+// (except search boxes).
 export default function TextField({
   id,
   label,
@@ -27,7 +28,8 @@ export default function TextField({
   ...inputProps
 }: TextFieldProps) {
   return (
-    <Field id={id} label={label} error={error} hint={hint} optional={!required}>
+    // A search box is never "optional" the way a form field is, so it isn't labelled so.
+    <Field id={id} label={label} error={error} hint={hint} optional={!required && type !== "search"}>
       <input
         id={id}
         type={type}
