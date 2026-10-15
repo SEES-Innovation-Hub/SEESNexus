@@ -69,15 +69,18 @@ always catch everything (e.g. some enum or index changes).
   authenticated user, while update and delete require the creator or an admin.
   `member_ids` replaces the member set wholesale; `thumbnail_url` stores a
   Cloudinary URL supplied by the client, since this backend never uploads.
+- **Events vertical**: `/api/v1/events` — public event listing/detail, admin
+  event management, authenticated registration, waitlisting, and admin
+  participant status views. Events use soft deletion so registration history is
+  retained.
 - Standard `{status, message, data}` response envelope, including for errors
 - JWT access/refresh tokens with type checking
 - `Hardware`/`HardwareLoan` models (needed for the admin loans endpoints);
-  `Event`/`Article` are minimal stand-in tables so the dashboard
-  counts real rows instead of hardcoded numbers — replace/extend them when
-  those verticals are built for real, keeping the table names the same.
+  `Article` remains a minimal stand-in table so the dashboard counts real rows
+  instead of hardcoded numbers.
 
 ## Not implemented here (other verticals / later milestones)
 
-Hardware CRUD (beyond loans), Events, Articles, and the `/upload`
+Hardware CRUD (beyond loans), Articles, and the `/upload`
 Cloudinary integration are out of scope for this slice — see the task
 assignment sheets for who owns each.

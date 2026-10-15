@@ -56,6 +56,22 @@ async def student_user(db_session: AsyncSession) -> User:
 
 
 @pytest_asyncio.fixture
+async def other_student_user(db_session: AsyncSession) -> User:
+    user = User(
+        full_name="Grace Student",
+        email="grace@unilag.edu.ng",
+        password=hash_password("StrongPass2"),
+        department="EEE",
+        level="300 Level",
+        role=UserRole.STUDENT,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def admin_user(db_session: AsyncSession) -> User:
     user = User(
         full_name="Admin User",
@@ -75,6 +91,15 @@ async def admin_user(db_session: AsyncSession) -> User:
 async def student_token(client: AsyncClient, student_user: User) -> str:
     resp = await client.post(
         "/api/v1/auth/login", json={"email": student_user.email, "password": "StrongPass1"}
+    )
+    return resp.json()["data"]["access_token"]
+
+
+@pytest_asyncio.fixture
+async def other_student_token(client: AsyncClient, other_student_user: User) -> str:
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": other_student_user.email, "password": "StrongPass2"},
     )
     return resp.json()["data"]["access_token"]
 
