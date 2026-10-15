@@ -75,3 +75,9 @@ body::before {
   z-index: -1;
   background-image: var(--background-image-gradient-sees);
 }
+
+/* While a modal is open (components/Modal), the page behind it must not scroll.
+   Pure CSS: no JavaScript scroll-lock to forget to undo. */
+html:has(dialog[open]:modal) {
+  overflow: hidden;
+}
