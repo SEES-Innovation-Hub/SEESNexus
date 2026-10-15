@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import * as authApi from "../../api/auth";
 import { errorMessage } from "../../api/client";
+import Button from "../../components/Button";
+import Card from "../../components/Card";
 import TextField from "../../components/TextField";
 
 interface OtpVerificationProps {
@@ -37,43 +39,38 @@ export function OtpVerification({
   const isBusy = isVerifying || isSubmitting;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded-2xl border border-sees-teal/40 bg-gradient-card p-8 shadow-sees-card"
-      >
-        <h1 className="text-2xl font-semibold text-sees-mint">Verify your email</h1>
-        <p className="text-sm wrap-anywhere text-white/60">We sent a code to {email}.</p>
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+      <Card padding="lg" className="w-full max-w-sm">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <h1 className="text-2xl font-semibold text-sees-mint">Verify your email</h1>
+          <p className="text-sm wrap-anywhere text-white/60">We sent a code to {email}.</p>
 
-        <TextField
-          id="otp"
-          label="Verification code"
-          value={code}
-          onChange={setCode}
-        />
+          <TextField
+            id="otp"
+            label="Verification code"
+            value={code}
+            onChange={setCode}
+          />
 
-        {verifyError && <p className="text-sm text-red-400">{verifyError}</p>}
+          {verifyError && <p className="text-sm text-red-400">{verifyError}</p>}
 
-        <button
-          type="submit"
-          disabled={isBusy}
-          className="w-full rounded bg-sees-mint py-2.5 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow disabled:opacity-50"
-        >
-          {isVerifying
-            ? "Verifying…"
-            : isSubmitting
-              ? "Creating account…"
-              : "Verify"}
-        </button>
+          <Button type="submit" isLoading={isBusy} className="w-full">
+            {isVerifying
+              ? "Verifying…"
+              : isSubmitting
+                ? "Creating account…"
+                : "Verify"}
+          </Button>
 
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-full py-3 text-sm text-sees-mustard underline hover:text-sees-mint"
-        >
-          Back
-        </button>
-      </form>
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-full py-3 text-sm text-sees-mustard underline hover:text-sees-mint"
+          >
+            Back
+          </button>
+        </form>
+      </Card>
     </div>
   );
 }

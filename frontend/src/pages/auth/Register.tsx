@@ -2,6 +2,8 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import * as authApi from "../../api/auth";
 import { errorMessage } from "../../api/client";
+import Button from "../../components/Button";
+import Card from "../../components/Card";
 import TextField from "../../components/TextField";
 import { useAuth } from "../../hooks/useAuth";
 import { prefetchPages } from "../../routes/pageLoaders";
@@ -90,58 +92,53 @@ export function Register() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-8">
-      <form
-        onSubmit={handleDetailsSubmit}
-        className="w-full max-w-sm space-y-4 rounded-2xl border border-sees-teal/40 bg-gradient-card p-8 shadow-sees-card"
-      >
-        <h1 className="text-2xl font-semibold text-sees-mint">Create an account</h1>
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+      <Card padding="lg" className="w-full max-w-sm">
+        <form onSubmit={handleDetailsSubmit} className="space-y-4">
+          <h1 className="text-2xl font-semibold text-sees-mint">Create an account</h1>
 
-        <TextField
-          id="full_name"
-          label="Full name"
-          value={details.full_name}
-          onChange={(v) => updateField("full_name", v)}
-        />
-        <TextField
-          id="email"
-          label="Email"
-          type="email"
-          value={details.email}
-          onChange={(v) => updateField("email", v)}
-        />
-        <TextField
-          id="password"
-          label="Password"
-          type="password"
-          value={details.password}
-          onChange={(v) => updateField("password", v)}
-          minLength={8}
-        />
-        <TextField
-          id="department"
-          label="Department"
-          value={details.department}
-          onChange={(v) => updateField("department", v)}
-        />
-        <TextField
-          id="level"
-          label="Level"
-          value={details.level}
-          onChange={(v) => updateField("level", v)}
-          required={false}
-        />
+          <TextField
+            id="full_name"
+            label="Full name"
+            value={details.full_name}
+            onChange={(v) => updateField("full_name", v)}
+          />
+          <TextField
+            id="email"
+            label="Email"
+            type="email"
+            value={details.email}
+            onChange={(v) => updateField("email", v)}
+          />
+          <TextField
+            id="password"
+            label="Password"
+            type="password"
+            value={details.password}
+            onChange={(v) => updateField("password", v)}
+            minLength={8}
+          />
+          <TextField
+            id="department"
+            label="Department"
+            value={details.department}
+            onChange={(v) => updateField("department", v)}
+          />
+          <TextField
+            id="level"
+            label="Level"
+            value={details.level}
+            onChange={(v) => updateField("level", v)}
+            required={false}
+          />
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full rounded bg-sees-mint py-2.5 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow disabled:opacity-50"
-        >
-          {isSubmitting ? "Sending code…" : "Continue"}
-        </button>
-      </form>
+          <Button type="submit" isLoading={isSubmitting} className="w-full">
+            {isSubmitting ? "Sending code…" : "Continue"}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

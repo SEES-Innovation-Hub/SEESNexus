@@ -1,68 +1,72 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { listProjects } from "../api/projects";
-import type { Project } from "../types/project";
+import { queryKeys } from "../api/queryKeys";
+import type { PaginatedProjects, Project } from "../types/project";
 
 export type ProjectsState =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; projects: Project[]; total: number };
 
-type ReadyState = Extract<ProjectsState, { status: "ready" }>;
-
 // The last successful list is kept in the browser so a returning visitor sees
 // projects on the very first paint instead of a skeleton. It is only a head start:
-// the fresh list from the API always replaces it as soon as it arrives.
+// it is handed to the query as already-stale data, so the fresh list from the API
+// is fetched straight away and replaces it as soon as it arrives.
 // Bump the version if the Project shape changes so old copies are ignored.
-const cacheKey = (pageSize: number) => `sees.projects.v1.${pageSize}`;
+const cacheKey = (pageSize: number) => `sees.projects.v2.${pageSize}`;
 const MAX_CACHE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-function readCache(pageSize: number): ReadyState | null {
+interface SavedPage {
+  savedAt: number;
+  page: PaginatedProjects;
+}
+
+function readCache(pageSize: number): SavedPage | undefined {
   try {
     const saved = JSON.parse(localStorage.getItem(cacheKey(pageSize)) ?? "null");
     const isUsable =
       saved &&
-      Array.isArray(saved.projects) &&
-      typeof saved.total === "number" &&
+      Array.isArray(saved.page?.items) &&
+      typeof saved.page?.total === "number" &&
       Date.now() - saved.savedAt < MAX_CACHE_AGE_MS;
-    return isUsable ? { status: "ready", projects: saved.projects, total: saved.total } : null;
+    return isUsable ? saved : undefined;
   } catch {
     // Storage blocked (e.g. private mode) or the saved text isn't valid JSON.
-    return null;
+    return undefined;
   }
 }
 
-function writeCache(pageSize: number, state: ReadyState) {
+function writeCache(pageSize: number, page: PaginatedProjects) {
   try {
-    const { projects, total } = state;
-    localStorage.setItem(cacheKey(pageSize), JSON.stringify({ savedAt: Date.now(), projects, total }));
+    const saved: SavedPage = { savedAt: Date.now(), page };
+    localStorage.setItem(cacheKey(pageSize), JSON.stringify(saved));
   } catch {
     // Storage full or blocked: caching is best-effort, the page works without it.
   }
 }
 
+// The newest `pageSize` projects, for the Landing showcase rail.
 export function useProjects(pageSize: number): ProjectsState {
-  const [state, setState] = useState<ProjectsState>(
-    () => readCache(pageSize) ?? { status: "loading" },
-  );
+  // Read once per mount: parsing storage on every render would be wasted work.
+  const [saved] = useState(() => readCache(pageSize));
+  const query = useQuery({
+    queryKey: queryKeys.projects.list({ pageSize }),
+    queryFn: async () => {
+      const page = await listProjects({ pageSize });
+      writeCache(pageSize, page);
+      return page;
+    },
+    initialData: saved?.page,
+    // Marks the saved copy with its real age, so it counts as stale and the
+    // query refreshes it immediately instead of trusting it for 30s.
+    initialDataUpdatedAt: saved?.savedAt,
+  });
 
-  // Fetching from the API on mount is syncing with an external system; the
-  // `ignore` flag drops the result of a stale request (StrictMode remount).
-  useEffect(() => {
-    let ignore = false;
-    listProjects(pageSize)
-      .then((page) => {
-        const fresh: ReadyState = { status: "ready", projects: page.items, total: page.total };
-        writeCache(pageSize, fresh);
-        if (!ignore) setState(fresh);
-      })
-      .catch(() => {
-        // A failed refresh must not throw away projects we can already show.
-        if (!ignore) setState((current) => (current.status === "ready" ? current : { status: "error" }));
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [pageSize]);
-
-  return state;
+  // A failed refresh keeps the projects we can already show (TanStack keeps
+  // `data` on error), so "error" only appears when there is nothing to show.
+  if (query.data) {
+    return { status: "ready", projects: query.data.items, total: query.data.total };
+  }
+  return query.isError ? { status: "error" } : { status: "loading" };
 }

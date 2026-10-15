@@ -1,10 +1,9 @@
+import { buttonClassName } from "../../components/Button/buttonClassName";
 import PrefetchLink from "../../components/PrefetchLink";
 import { useAuth } from "../../hooks/useAuth";
 
-const primaryCta =
-  "rounded bg-sees-mint px-6 py-3 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow";
-const secondaryCta =
-  "rounded border border-sees-teal px-6 py-3 font-medium text-sees-mint hover:border-sees-mint";
+const primaryCta = buttonClassName("primary", "", "lg");
+const secondaryCta = buttonClassName("secondary", "", "lg");
 
 export function HeroSection() {
   const { user, isLoading } = useAuth();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { generateImage } from '../../api/imageGeneration'
 import { errorMessage } from '../../api/client'
 import { uploadImage } from '../../api/upload'
+import Button from '../Button'
 import TextField from '../TextField'
 
 // A fresh image can take ~45s upstream; give it well over that before giving up.
@@ -119,23 +120,23 @@ export default function ImageGenerator({ defaultTopic = '', onUploaded }: ImageG
 
       <div className="flex gap-3">
         {image && (
-          <button
-            type="button"
+          <Button
             onClick={handleUse}
             disabled={isBusy}
-            className="flex-1 rounded bg-sees-mint py-2.5 font-medium text-sees-forest transition-shadow hover:shadow-sees-glow disabled:opacity-50"
+            isLoading={status === 'uploading'}
+            className="flex-1"
           >
             {status === 'uploading' ? 'Uploading…' : 'Use this image'}
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={handleGenerate}
           disabled={isBusy || topic.trim() === ''}
-          className="flex-1 rounded border border-sees-teal py-2.5 font-medium text-sees-mint hover:border-sees-mint disabled:opacity-50"
+          className="flex-1"
         >
           {image ? 'Generate again' : 'Generate'}
-        </button>
+        </Button>
       </div>
 
       <p className="text-xs text-white/50">
