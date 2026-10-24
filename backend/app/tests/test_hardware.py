@@ -90,11 +90,17 @@ async def seed_hardware(
     return hardware
 
 
-async def test_list_is_public_and_paginated(client: AsyncClient, db_session: AsyncSession):
+async def test_list_requires_auth_and_paginates(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
     await seed_hardware(db_session, name="Scope A")
     await seed_hardware(db_session, name="Scope B", quantity=2)
 
-    resp = await client.get(f"{BASE}?page=1&page_size=1")
+    # Members only: anonymous callers are rejected.
+    anon = await client.get(f"{BASE}?page=1&page_size=1")
+    assert anon.status_code == 401
+
+    resp = await client.get(f"{BASE}?page=1&page_size=1", headers=auth_header(student_token))
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "success"
@@ -105,10 +111,15 @@ async def test_list_is_public_and_paginated(client: AsyncClient, db_session: Asy
     assert body["data"]["items"][0]["name"] == "Scope A"
 
 
-async def test_detail_is_public(client: AsyncClient, db_session: AsyncSession):
+async def test_detail_requires_auth(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
     item = await seed_hardware(db_session, name="Thermocouple")
 
-    resp = await client.get(f"{BASE}/{item.id}")
+    anon = await client.get(f"{BASE}/{item.id}")
+    assert anon.status_code == 401
+
+    resp = await client.get(f"{BASE}/{item.id}", headers=auth_header(student_token))
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "success"
