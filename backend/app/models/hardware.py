@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -57,3 +57,7 @@ class HardwareLoan(Base):
     approval_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expected_return_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     actual_return_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Eager-loaded so LoanPublic.hardware_name can be filled without a per-row
+    # round trip when the loan list routes serialise many loans at once.
+    hardware: Mapped["Hardware"] = relationship(lazy="selectin")

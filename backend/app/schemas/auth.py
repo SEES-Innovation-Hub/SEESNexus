@@ -66,3 +66,17 @@ class UserUpdateRequest(BaseModel):
     level: str | None = None
     bio: str | None = None
     profile_image_url: str | None = None
+
+
+class UserSearchResult(BaseModel):
+    """Narrow projection for the teammate picker.
+
+    Deliberately leaves out email, role, bio, is_active, department -- any
+    logged-in user can call /users/search, and only the minimum needed to
+    render a result row belongs in the response.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    full_name: str
+    profile_image_url: str | None

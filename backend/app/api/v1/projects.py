@@ -70,9 +70,10 @@ async def list_projects(
     page_size: int = Query(default=20, ge=1),
     category: ProjectCategory | None = None,
     status_filter: ProjectStatus | None = Query(default=None, alias="status"),
+    _current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Public: no auth dependency. Nothing in the response varies by caller."""
+    """Members only: any logged-in user can browse the project directory."""
     stmt = select(Project)
     if category is not None:
         stmt = stmt.where(Project.category == category)
@@ -123,7 +124,11 @@ async def create_project(
 
 
 @router.get("/{project_id}")
-async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
+async def get_project(
+    project_id: str,
+    _current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     project = await _get_project_or_404(db, project_id)
     return success(data=_serialize(project))
 
