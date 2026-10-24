@@ -318,13 +318,12 @@ async def test_my_loans_lists_only_current_user(
     assert hardware_b.id not in ids
 
 
-async def test_return_loan_by_borrower_updates_inventory(
+async def test_admin_return_loan_updates_inventory(
     client: AsyncClient,
     db_session: AsyncSession,
     admin_user: User,
     admin_token: str,
     student_user: User,
-    student_token: str,
 ):
     item = await seed_hardware(db_session, name="Scope Return", quantity=2, added_by_id=student_user.id)
     loan = HardwareLoan(
@@ -344,8 +343,8 @@ async def test_return_loan_by_borrower_updates_inventory(
     await db_session.commit()
 
     resp = await client.put(
-        f"{BASE}/loans/{loan.id}/return",
-        headers=auth_header(student_token),
+        f"/api/v1/admin/loans/{loan.id}/return",
+        headers=auth_header(admin_token),
     )
     assert resp.status_code == 200
     assert resp.json()["data"]["status"] == "RETURNED"
@@ -354,15 +353,12 @@ async def test_return_loan_by_borrower_updates_inventory(
     assert refreshed.available_quantity == 2
 
 
-async def test_return_loan_forbidden_for_admin_or_other_student(
+async def test_admin_return_loan_forbidden_for_students(
     client: AsyncClient,
     db_session: AsyncSession,
-    admin_token: str,
     student_token: str,
     student_user: User,
     admin_user: User,
-    other_student_user: User,
-    other_student_token: str,
 ):
     item = await seed_hardware(db_session, name="Admin Return Guard", quantity=2, added_by_id=student_user.id)
     loan = HardwareLoan(
@@ -378,15 +374,15 @@ async def test_return_loan_forbidden_for_admin_or_other_student(
     await db_session.commit()
     await db_session.refresh(loan)
 
-    resp = await client.put(f"{BASE}/loans/{loan.id}/return", headers=auth_header(admin_token))
+    resp = await client.put(
+        f"/api/v1/admin/loans/{loan.id}/return",
+        headers=auth_header(student_token),
+    )
     assert resp.status_code == 403
 
-    resp = await client.put(f"{BASE}/loans/{loan.id}/return", headers=auth_header(other_student_token))
-    assert resp.status_code == 403
 
-
-async def test_return_loan_rejects_pending_or_unknown(
-    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
+async def test_admin_return_loan_rejects_pending_or_unknown(
+    client: AsyncClient, db_session: AsyncSession, student_user: User, admin_token: str
 ):
     item = await seed_hardware(db_session, name="Bad Return", quantity=2, added_by_id=student_user.id)
     loan = HardwareLoan(
@@ -400,10 +396,14 @@ async def test_return_loan_rejects_pending_or_unknown(
     await db_session.commit()
     await db_session.refresh(loan)
 
-    resp = await client.put(f"{BASE}/loans/{loan.id}/return", headers=auth_header(student_token))
+    resp = await client.put(
+        f"/api/v1/admin/loans/{loan.id}/return", headers=auth_header(admin_token)
+    )
     assert resp.status_code == 400
 
-    resp = await client.put(f"{BASE}/loans/does-not-exist/return", headers=auth_header(student_token))
+    resp = await client.put(
+        "/api/v1/admin/loans/does-not-exist/return", headers=auth_header(admin_token)
+    )
     assert resp.status_code == 404
 
 
@@ -411,9 +411,7 @@ async def test_loan_invariant_approve_then_return_restores_quantity(
     client: AsyncClient,
     db_session: AsyncSession,
     admin_token: str,
-    student_token: str,
     student_user: User,
-    admin_user: User,
 ):
     item = await seed_hardware(db_session, name="Quantity Restore", quantity=2, added_by_id=student_user.id)
     loan = HardwareLoan(
@@ -432,7 +430,7 @@ async def test_loan_invariant_approve_then_return_restores_quantity(
     item = await db_session.get(Hardware, item.id)
     assert item.available_quantity == 1
 
-    resp = await client.put(f"{BASE}/loans/{loan.id}/return", headers=auth_header(student_token))
+    resp = await client.put(f"/api/v1/admin/loans/{loan.id}/return", headers=auth_header(admin_token))
     assert resp.status_code == 200
     item = await db_session.get(Hardware, item.id)
     assert item.available_quantity == 2
@@ -491,15 +489,15 @@ async def test_protected_endpoints_reject_anonymous_callers(
     client: AsyncClient, db_session: AsyncSession, student_user: User
 ):
     item = await seed_hardware(db_session, name="Anon Guard", quantity=1)
-    loan = await seed_loan(db_session, hardware=item, borrower=student_user)
 
     calls = [
+        client.get(BASE),
+        client.get(f"{BASE}/{item.id}"),
         client.post(BASE, json={}),
         client.put(f"{BASE}/{item.id}", json={"name": "x"}),
         client.delete(f"{BASE}/{item.id}"),
         client.post(f"{BASE}/{item.id}/loan", json={"purpose": "x"}),
         client.get(f"{BASE}/loans/my"),
-        client.put(f"{BASE}/loans/{loan.id}/return"),
     ]
     for call in calls:
         resp = await call
@@ -521,7 +519,9 @@ async def test_admin_only_endpoints_reject_students(
 
 
 async def test_unknown_ids_are_404(client: AsyncClient, admin_token: str, student_token: str):
-    assert (await client.get(f"{BASE}/does-not-exist")).status_code == 404
+    assert (
+        await client.get(f"{BASE}/does-not-exist", headers=auth_header(student_token))
+    ).status_code == 404
 
     resp = await client.put(
         f"{BASE}/does-not-exist", json={"name": "x"}, headers=auth_header(admin_token)
@@ -540,7 +540,9 @@ async def test_unknown_ids_are_404(client: AsyncClient, admin_token: str, studen
 # --- List shaping ---
 
 
-async def test_list_filters_and_ordering(client: AsyncClient, db_session: AsyncSession):
+async def test_list_filters_and_ordering(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
     await seed_hardware(db_session, name="Zeta Meter", category=HardwareCategory.MEASUREMENT)
     await seed_hardware(db_session, name="Alpha Board", category=HardwareCategory.MICROCONTROLLER)
     await seed_hardware(
@@ -548,23 +550,28 @@ async def test_list_filters_and_ordering(client: AsyncClient, db_session: AsyncS
         status=HardwareStatus.MAINTENANCE,
     )
 
-    resp = await client.get(BASE)
+    headers = auth_header(student_token)
+    resp = await client.get(BASE, headers=headers)
     names = [item["name"] for item in resp.json()["data"]["items"]]
     assert names == sorted(names), "inventory is ordered by name ascending"
 
-    resp = await client.get(BASE, params={"category": "MICROCONTROLLER"})
+    resp = await client.get(BASE, params={"category": "MICROCONTROLLER"}, headers=headers)
     items = resp.json()["data"]["items"]
     assert [item["name"] for item in items] == ["Alpha Board"]
 
-    resp = await client.get(BASE, params={"status": "MAINTENANCE"})
+    resp = await client.get(BASE, params={"status": "MAINTENANCE"}, headers=headers)
     items = resp.json()["data"]["items"]
     assert [item["name"] for item in items] == ["Mid Resistor"]
 
 
-async def test_page_size_is_clamped_server_side(client: AsyncClient, db_session: AsyncSession):
+async def test_page_size_is_clamped_server_side(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
     await seed_hardware(db_session, name="Clamp Probe")
 
-    resp = await client.get(BASE, params={"page_size": 5000})
+    resp = await client.get(
+        BASE, params={"page_size": 5000}, headers=auth_header(student_token)
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["page_size"] == 100
 
@@ -597,7 +604,6 @@ async def test_last_unit_flips_to_borrowed_and_back_on_return(
     admin_user: User,
     admin_token: str,
     student_user: User,
-    student_token: str,
 ):
     item = await seed_hardware(db_session, name="Sole Unit", quantity=1, added_by_id=admin_user.id)
     loan = await seed_loan(db_session, hardware=item, borrower=student_user)
@@ -612,7 +618,9 @@ async def test_last_unit_flips_to_borrowed_and_back_on_return(
     assert refreshed.available_quantity == 0
     assert refreshed.status is HardwareStatus.BORROWED
 
-    resp = await client.put(f"{BASE}/loans/{loan.id}/return", headers=auth_header(student_token))
+    resp = await client.put(
+        f"/api/v1/admin/loans/{loan.id}/return", headers=auth_header(admin_token)
+    )
     assert resp.status_code == 200
 
     await db_session.refresh(refreshed)
@@ -626,7 +634,6 @@ async def test_maintenance_status_survives_approval_and_return(
     admin_user: User,
     admin_token: str,
     student_user: User,
-    student_token: str,
 ):
     """An item on the repair bench stays there regardless of units moving.
 
@@ -648,7 +655,9 @@ async def test_maintenance_status_survives_approval_and_return(
     assert item.available_quantity == 0
     assert item.status is HardwareStatus.MAINTENANCE
 
-    resp = await client.put(f"{BASE}/loans/{loan.id}/return", headers=auth_header(student_token))
+    resp = await client.put(
+        f"/api/v1/admin/loans/{loan.id}/return", headers=auth_header(admin_token)
+    )
     assert resp.status_code == 200
 
     await db_session.refresh(item)
@@ -693,6 +702,39 @@ async def test_my_loans_includes_closed_loans(
     assert resp.status_code == 200
     states = {loan["status"] for loan in resp.json()["data"]}
     assert states == {"RETURNED", "REJECTED"}
+
+
+async def test_loan_response_carries_hardware_name(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_user: User,
+    student_user: User,
+    student_token: str,
+    admin_token: str,
+):
+    """Loan rows surface the item's human name alongside its id.
+
+    The frontend lists loans without a second round trip per row, so
+    hardware_name must be present on every loan response.
+    """
+    item = await seed_hardware(db_session, name="Named Scope", quantity=1, added_by_id=admin_user.id)
+    loan = await seed_loan(db_session, hardware=item, borrower=student_user)
+
+    resp = await client.get(f"{BASE}/loans/my", headers=auth_header(student_token))
+    assert resp.status_code == 200
+    rows = resp.json()["data"]
+    assert any(row["id"] == loan.id and row["hardware_name"] == "Named Scope" for row in rows)
+
+    resp = await client.get("/api/v1/admin/loans", headers=auth_header(admin_token))
+    assert resp.status_code == 200
+    rows = resp.json()["data"]
+    assert any(row["id"] == loan.id and row["hardware_name"] == "Named Scope" for row in rows)
+
+    resp = await client.put(
+        f"/api/v1/admin/loans/{loan.id}/approve", headers=auth_header(admin_token)
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["hardware_name"] == "Named Scope"
 
 
 async def test_retired_item_cannot_be_borrowed(
