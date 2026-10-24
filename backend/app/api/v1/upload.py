@@ -40,7 +40,11 @@ async def upload_image(
     file: UploadFile = File(...),
     _current_user: User = Depends(get_current_user),
 ):
-    if not (settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_API_SECRET):
+    if not (
+        settings.CLOUDINARY_CLOUD_NAME
+        and settings.CLOUDINARY_API_KEY
+        and settings.CLOUDINARY_API_SECRET
+    ):
         # Fail with a clear 503 rather than letting Cloudinary return an
         # opaque auth error from inside the SDK.
         raise HTTPException(
