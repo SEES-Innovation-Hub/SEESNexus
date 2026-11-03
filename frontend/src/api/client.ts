@@ -37,6 +37,11 @@ export function errorMessage(error: unknown, fallback: string): string {
   );
 }
 
+// True when the server answered 404, e.g. a project link to something deleted.
+export function isNotFoundError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 404;
+}
+
 // Lets the auth context drop its user when the session dies mid-use. A hard
 // redirect here would also bounce public pages (Landing) for stale tokens.
 let onSessionExpired: (() => void) | null = null;

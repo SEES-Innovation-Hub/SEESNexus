@@ -13,6 +13,10 @@ const Login = lazy(() => pageLoaders.login().then((m) => ({ default: m.Login }))
 const Register = lazy(() => pageLoaders.register().then((m) => ({ default: m.Register })));
 const AppLayout = lazy(() => pageLoaders.appLayout().then((m) => ({ default: m.AppLayout })));
 const Profile = lazy(() => pageLoaders.profile().then((m) => ({ default: m.Profile })));
+const ProjectsList = lazy(() => pageLoaders.projectsList().then((m) => ({ default: m.ProjectsList })));
+const ProjectDetail = lazy(() => pageLoaders.projectDetail().then((m) => ({ default: m.ProjectDetail })));
+const NewProject = lazy(() => pageLoaders.newProject().then((m) => ({ default: m.NewProject })));
+const EditProject = lazy(() => pageLoaders.editProject().then((m) => ({ default: m.EditProject })));
 const ComponentsPreview = lazy(() =>
   import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
 );
@@ -29,16 +33,36 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        {/* Signed-in pages share the sidebar layout. Admin-only pages will go in
-            a nested route wrapped in AdminRoute (Phase 3). */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <AppLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/profile" element={<Profile />} />
+        {/* The app's inner pages share the sidebar layout. Some are public (browsing
+            projects); the rest are wrapped in ProtectedRoute one by one. Admin-only
+            pages will additionally be wrapped in AdminRoute (Phase 3). */}
+        <Route element={<AppLayout />}>
+          <Route path="/projects" element={<ProjectsList />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route
+            path="/projects/new"
+            element={
+              <ProtectedRoute>
+                <NewProject />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/edit"
+            element={
+              <ProtectedRoute>
+                <EditProject />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
         </Route>
         {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}
         {import.meta.env.DEV && (
