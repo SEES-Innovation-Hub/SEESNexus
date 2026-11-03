@@ -72,13 +72,18 @@ async def other_student_token(client: AsyncClient, other_student_user: User) -> 
     return resp.json()["data"]["access_token"]
 
 
-# --- GET /projects (public) ---
+# --- GET /projects (members only) ---
 
 
-async def test_list_is_public(client: AsyncClient, db_session: AsyncSession, student_user: User):
+async def test_list_requires_auth(
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
+):
     await seed_project(db_session, student_user)
 
-    resp = await client.get(BASE)
+    anon = await client.get(BASE)
+    assert anon.status_code == 401
+
+    resp = await client.get(BASE, headers=auth_header(student_token))
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "success"
@@ -87,26 +92,31 @@ async def test_list_is_public(client: AsyncClient, db_session: AsyncSession, stu
 
 
 async def test_list_orders_by_created_at_desc(
-    client: AsyncClient, db_session: AsyncSession, student_user: User
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
 ):
     for i in range(3):
         await seed_project(db_session, student_user, offset=i, title=f"P{i}")
 
-    resp = await client.get(BASE)
+    resp = await client.get(BASE, headers=auth_header(student_token))
     titles = [item["title"] for item in resp.json()["data"]["items"]]
     assert titles == ["P2", "P1", "P0"]
 
 
-async def test_detail_is_public(client: AsyncClient, db_session: AsyncSession, student_user: User):
+async def test_detail_requires_auth(
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
+):
     project = await seed_project(db_session, student_user)
 
-    resp = await client.get(f"{BASE}/{project.id}")
+    anon = await client.get(f"{BASE}/{project.id}")
+    assert anon.status_code == 401
+
+    resp = await client.get(f"{BASE}/{project.id}", headers=auth_header(student_token))
     assert resp.status_code == 200
     assert resp.json()["data"]["id"] == project.id
 
 
-async def test_detail_unknown_id_404(client: AsyncClient):
-    resp = await client.get(f"{BASE}/does-not-exist")
+async def test_detail_unknown_id_404(client: AsyncClient, student_token: str):
+    resp = await client.get(f"{BASE}/does-not-exist", headers=auth_header(student_token))
     assert resp.status_code == 404
     assert resp.json()["status"] == "error"
 
@@ -293,29 +303,33 @@ async def test_delete_removes_member_rows(
 # --- filtering ---
 
 
-async def test_filter_by_category(client: AsyncClient, db_session: AsyncSession, student_user: User):
+async def test_filter_by_category(
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
+):
     await seed_project(db_session, student_user, offset=0, category=ProjectCategory.IOT)
     await seed_project(db_session, student_user, offset=1, category=ProjectCategory.WEB)
 
-    resp = await client.get(BASE, params={"category": "IOT"})
+    resp = await client.get(BASE, params={"category": "IOT"}, headers=auth_header(student_token))
     assert resp.status_code == 200
     items = resp.json()["data"]["items"]
     assert len(items) == 1
     assert items[0]["category"] == "IOT"
 
 
-async def test_filter_by_status(client: AsyncClient, db_session: AsyncSession, student_user: User):
+async def test_filter_by_status(
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
+):
     await seed_project(db_session, student_user, offset=0, status=ProjectStatus.COMPLETED)
     await seed_project(db_session, student_user, offset=1, status=ProjectStatus.IDEATION)
 
-    resp = await client.get(BASE, params={"status": "COMPLETED"})
+    resp = await client.get(BASE, params={"status": "COMPLETED"}, headers=auth_header(student_token))
     items = resp.json()["data"]["items"]
     assert len(items) == 1
     assert items[0]["status"] == "COMPLETED"
 
 
 async def test_filter_by_category_and_status(
-    client: AsyncClient, db_session: AsyncSession, student_user: User
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
 ):
     await seed_project(
         db_session,
@@ -339,7 +353,11 @@ async def test_filter_by_category_and_status(
         status=ProjectStatus.COMPLETED,
     )
 
-    resp = await client.get(BASE, params={"category": "IOT", "status": "COMPLETED"})
+    resp = await client.get(
+        BASE,
+        params={"category": "IOT", "status": "COMPLETED"},
+        headers=auth_header(student_token),
+    )
     data = resp.json()["data"]
     assert data["total"] == 1
     assert data["items"][0]["title"] == "Project 0"
@@ -349,12 +367,14 @@ async def test_filter_by_category_and_status(
 
 
 async def test_pagination_second_page_slice(
-    client: AsyncClient, db_session: AsyncSession, student_user: User
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
 ):
     for i in range(25):
         await seed_project(db_session, student_user, offset=i, title=f"P{i:02d}")
 
-    resp = await client.get(BASE, params={"page": 2, "page_size": 10})
+    resp = await client.get(
+        BASE, params={"page": 2, "page_size": 10}, headers=auth_header(student_token)
+    )
     data = resp.json()["data"]
     assert data["total"] == 25
     assert data["total_pages"] == 3
@@ -364,12 +384,14 @@ async def test_pagination_second_page_slice(
 
 
 async def test_page_size_clamped_to_100(
-    client: AsyncClient, db_session: AsyncSession, student_user: User
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
 ):
     for i in range(3):
         await seed_project(db_session, student_user, offset=i)
 
-    resp = await client.get(BASE, params={"page_size": 1000})
+    resp = await client.get(
+        BASE, params={"page_size": 1000}, headers=auth_header(student_token)
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["page_size"] == 100
 

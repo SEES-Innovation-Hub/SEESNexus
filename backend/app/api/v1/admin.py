@@ -53,11 +53,24 @@ async def list_users(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/users/{user_id}/role")
-async def change_role(user_id: str, payload: RoleChangeRequest, db: AsyncSession = Depends(get_db)):
+async def change_role(
+    user_id: str,
+    payload: RoleChangeRequest,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Guard the lab against the last admin demoting themselves and locking the
+    # whole admin surface. A different admin can still change this one's role.
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot change your own role",
+        )
 
     user.role = payload.role
     await db.commit()
@@ -66,17 +79,46 @@ async def change_role(user_id: str, payload: RoleChangeRequest, db: AsyncSession
 
 
 @router.delete("/users/{user_id}")
-async def deactivate_user(user_id: str, db: AsyncSession = Depends(get_db)):
+async def deactivate_user(
+    user_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Same reason as change_role: self-deactivation would lock the acting admin
+    # out of every endpoint on their next request (get_current_user rejects
+    # inactive users).
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot deactivate yourself",
+        )
 
     # Soft-delete only: Tech Doc §4.3 forbids cascade-deleting a user's
     # projects/articles/loans, so we deactivate rather than hard-delete.
     user.is_active = False
     await db.commit()
     return success(message="User deactivated")
+
+
+@router.put("/users/{user_id}/activate")
+async def activate_user(user_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.is_active = True
+    await db.commit()
+    await db.refresh(user)
+    return success(
+        data=UserPublic.model_validate(user).model_dump(mode="json"),
+        message="User reactivated",
+    )
 
 
 @router.get("/loans")
@@ -103,6 +145,16 @@ async def reject_loan(loan_id: str, admin: User = Depends(require_admin), db: As
     loan = await _get_loan_or_404(db, loan_id)
     loan = await loans.reject_loan(db, loan, admin)
     return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan rejected")
+
+
+@router.put("/loans/{loan_id}/return")
+async def return_loan(loan_id: str, db: AsyncSession = Depends(get_db)):
+    # Admin confirms the physical return. The service enforces that only an
+    # APPROVED loan can be returned and bumps the availability counter back up
+    # under a row lock, so no additional guard is needed here.
+    loan = await _get_loan_or_404(db, loan_id)
+    loan = await loans.return_loan(db, loan)
+    return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan returned")
 
 
 async def _get_loan_or_404(db: AsyncSession, loan_id: str) -> HardwareLoan:

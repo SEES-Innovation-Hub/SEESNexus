@@ -58,9 +58,10 @@ async def list_hardware(
     page_size: int = Query(default=20, ge=1),
     category: HardwareCategory | None = None,
     status_filter: HardwareStatus | None = Query(default=None, alias="status"),
+    _current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Public: no auth dependency. Nothing in the response varies by caller."""
+    """Members only: any logged-in user can browse the hardware shelf."""
     stmt = select(Hardware)
     if category is not None:
         stmt = stmt.where(Hardware.category == category)
@@ -133,25 +134,12 @@ async def list_my_loans(
     return success(data=data)
 
 
-@router.put("/loans/{loan_id}/return")
-async def return_loan(
-    loan_id: str,
-    current_user: User = Depends(get_current_user),
+@router.get("/{hardware_id}")
+async def get_hardware(
+    hardware_id: str,
+    _current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    loan = await _get_loan_or_404(db, loan_id)
-    if loan.borrower_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to return this loan",
-        )
-
-    loan = await loans.return_loan(db, loan)
-    return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan returned")
-
-
-@router.get("/{hardware_id}")
-async def get_hardware(hardware_id: str, db: AsyncSession = Depends(get_db)):
     hardware = await _get_hardware_or_404(db, hardware_id)
     return success(data=_serialize(hardware))
 
@@ -220,11 +208,3 @@ async def request_hardware_loan(
     hardware = await _get_hardware_or_404(db, hardware_id)
     loan = await loans.request_loan(db, hardware, current_user, payload)
     return success(data=LoanPublic.model_validate(loan).model_dump(mode="json"), message="Loan requested")
-
-
-async def _get_loan_or_404(db: AsyncSession, loan_id: str) -> HardwareLoan:
-    result = await db.execute(select(HardwareLoan).where(HardwareLoan.id == loan_id))
-    loan = result.scalar_one_or_none()
-    if loan is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
-    return loan

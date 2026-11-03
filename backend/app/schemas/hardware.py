@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.hardware import HardwareCategory, HardwareStatus, LoanStatus
 
@@ -66,6 +67,7 @@ class LoanPublic(BaseModel):
 
     id: str
     hardware_id: str
+    hardware_name: str | None = None
     borrower_id: str
     approved_by_id: str | None
     status: LoanStatus
@@ -74,3 +76,29 @@ class LoanPublic(BaseModel):
     approval_date: datetime | None
     expected_return_date: datetime | None
     actual_return_date: datetime | None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _pull_hardware_name(cls, data: Any) -> Any:
+        # Lift the related item's name onto the flat response when validating
+        # from an ORM row. HardwareLoan.hardware is selectin-loaded, so the
+        # attribute is present without a trailing round trip. A plain dict
+        # (e.g. in tests) is passed through unchanged.
+        if isinstance(data, dict):
+            return data
+        hardware = getattr(data, "hardware", None)
+        if hardware is None:
+            return data
+        return {
+            "id": data.id,
+            "hardware_id": data.hardware_id,
+            "hardware_name": hardware.name,
+            "borrower_id": data.borrower_id,
+            "approved_by_id": data.approved_by_id,
+            "status": data.status,
+            "purpose": data.purpose,
+            "request_date": data.request_date,
+            "approval_date": data.approval_date,
+            "expected_return_date": data.expected_return_date,
+            "actual_return_date": data.actual_return_date,
+        }
