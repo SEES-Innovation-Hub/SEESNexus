@@ -39,8 +39,7 @@ function MemberAvatar({ member }: { member: ProjectMember }) {
 const linkClassName =
   "relative z-10 -mx-1.5 -my-3 px-1.5 py-3 text-sees-mustard underline hover:text-sees-mint";
 
-// The width comes from the parent (a fixed width in Landing's rail, a grid
-// column on the Projects page). The whole card opens the project: the title's
+// The width comes from the parent's grid column. The whole card opens the project: the title's
 // link is stretched over the card with an ::after layer.
 export default function ProjectCard({ project }: { project: Project }) {
   const extraTech = project.tech_stack.length - MAX_TECH_BADGES;

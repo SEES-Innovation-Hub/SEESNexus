@@ -17,14 +17,14 @@ export interface HardwareListParams {
   status?: HardwareStatus;
 }
 
-// Public endpoint, ordered by name.
+// Signed in, ordered by name.
 export function listHardware({ page, pageSize, category, status }: HardwareListParams = {}) {
   return unwrap<PaginatedHardware>(
     api.get("/hardware", { params: { page, page_size: pageSize, category, status } }),
   );
 }
 
-// Public endpoint.
+// Signed in.
 export function getHardware(id: string) {
   return unwrap<Hardware>(api.get(`/hardware/${id}`));
 }

@@ -41,7 +41,7 @@ src/
   api/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
-    projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
+    projects.ts                listProjects, getProject, createProject, updateProject, deleteProject
     hardware.ts                listHardware, getHardware; requestLoan, listMyLoans (no self-return, §3.13);
                                createHardware, updateHardware, retireHardware (admin)
     admin.ts                   getAdminStats, listUsers, changeUserRole, deactivateUser, listAllLoans, approveLoan, rejectLoan
@@ -58,7 +58,6 @@ src/
   hooks/
     useAuth.ts                 the only way components read the session
     useLogout.ts               what every "Log out" button calls (§3.2)
-    useShowcaseProjects.ts     Landing's rail (useQuery + a remembered copy, §3.5)
     useProjectList.ts          a page of projects with filters (Projects page)
     useProject.ts              one project (shows a list's copy instantly, §3.12)
     useCreateProject.ts / useUpdateProject.ts / useDeleteProject.ts   changes; each refreshes the lists
@@ -80,7 +79,7 @@ src/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
     Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/  StatTile/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
-    landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail,
+    landing/   Landing, LandingNav, HeroSection,
                PillarsSection, TeamSection, JoinSection, LandingFooter
     auth/      Login, Register, OtpVerification
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
@@ -155,15 +154,8 @@ What we get for free: one request even if two components ask for the same data, 
 - **On login, logout and session expiry** `AuthProvider` empties the whole cache, so one person's private data (their loans, the admin's user list) never shows to the next person on a shared computer.
 - The signed-in user is **not** in the query cache; it stays in `AuthProvider` (§3.2).
 
-### 3.5 The project rail (`useShowcaseProjects`)
-```
-first render:  readCache() ── found & fresh (≤ 7 days)? ─► show those cards immediately (marked stale)
-                        └── else ► skeleton
-at once:       useQuery → GET /projects?page_size=12
-                 ├─ success ► show fresh list + write it to the cache
-                 └─ failure ► keep cached cards if we have them, otherwise the error state
-```
-The saved copy is handed to `useQuery` as `initialData` with its real save time, so it is shown instantly but refreshed straight away. The cache key is `sees.projects.v2.<pageSize>`. Bump the version if the `Project` type changes. Landing's rail shows four states: loading skeleton, error, empty, data.
+### 3.5 Landing has no project preview
+The backend requires login for `GET /projects`, so Landing no longer shows projects. Members browse them at `/projects`.
 
 ### 3.6 The AI image generator (`ImageGenerator`)
 `topic → generateImage()` (image service) → preview from an object URL → **Use this image** → `uploadImage()` (`/upload/image`) → `onUploaded(url)` to the host form, which stores it as the project's `thumbnail_url`. It can be cancelled, times out after 90 s, keeps the previous preview when a new attempt fails, and revokes its object URLs when replaced or unmounted.
@@ -186,7 +178,7 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 - `ProfileAvatar`: pick a file, `uploadImage(file)` returns a URL, then `updateProfile({ profile_image_url })`. A failed upload shows a message and leaves the current photo.
 
 ### 3.9 How Landing is put together
-`Landing` only composes: `LandingNav`, then in `<main>` `HeroSection`, `ProjectShowcaseRail`, `PillarsSection`, `TeamSection`, `JoinSection`, and `LandingFooter`. The nav, hero, join banner and footer are **auth-aware** (`useAuth()`): signed-out visitors see Log in / Register / Get started, signed-in users see Profile links and no join banner, and nothing is shown while the session is still being restored.
+`Landing` only composes: `LandingNav`, then in `<main>` `HeroSection`, `PillarsSection`, `TeamSection`, `JoinSection`, and `LandingFooter`. Only visitors see it (`GuestRoute` sends members into the app), and it makes no API calls: the backend requires login for projects and hardware.
 
 | Element | Phone (under 768px) | Tablet and up |
 |---|---|---|
