@@ -127,14 +127,22 @@ async def list_events(
     viewer: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    if include_deleted and (viewer is None or viewer.role != UserRole.ADMIN):
-        # 403 rather than silently ignoring the flag: a caller asking for
-        # deleted events should be told they cannot have them, not handed a
-        # filtered list they will mistake for the full one.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only an admin may list deleted events",
-        )
+    if include_deleted:
+        # Refused rather than silently ignored: a caller asking for deleted
+        # events should be told they cannot have them, not handed a filtered
+        # list they will mistake for the full one.
+        #
+        # 401 for no credentials and 403 for the wrong role, matching what
+        # get_current_user and require_roles do everywhere else.
+        if viewer is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+            )
+        if viewer.role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only an admin may list deleted events",
+            )
 
     stmt = select(Event)
     if not include_deleted:

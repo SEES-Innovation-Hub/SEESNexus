@@ -589,10 +589,11 @@ async def test_include_deleted_is_admin_only(
     assert found.status_code == 200
     assert [item["id"] for item in found.json()["data"]["items"]] == [event["id"]]
 
+    # 403 for a logged-in non-admin, 401 with no token, as everywhere else.
     assert (
         await client.get(f"{BASE}?include_deleted=true", headers=auth_header(student_token))
     ).status_code == 403
-    assert (await client.get(f"{BASE}?include_deleted=true")).status_code == 403
+    assert (await client.get(f"{BASE}?include_deleted=true")).status_code == 401
 
 
 @pytest.mark.asyncio
