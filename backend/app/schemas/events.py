@@ -90,6 +90,22 @@ class EventParticipantResponse(EventRegistrationResponse):
     student_email: str
 
 
+class MyRegistrationResponse(EventRegistrationResponse):
+    """One of the caller's own registrations, with enough of the event to render it.
+
+    Carries the event fields the "my events" screen needs so it does not have to
+    fetch each event separately. virtual_link follows the same rule as
+    EventResponse: it is filled only for a CONFIRMED registration.
+    """
+
+    event_title: str
+    start_date: datetime
+    end_date: datetime
+    location: str
+    is_virtual: bool
+    virtual_link: str | None = None
+
+
 class PaginatedEventsResponse(BaseModel):
     items: list[EventResponse]
     page: int

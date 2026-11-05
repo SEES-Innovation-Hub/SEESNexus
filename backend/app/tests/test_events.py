@@ -343,6 +343,258 @@ async def test_rejected_date_update_does_not_persist(
     assert detail.json()["data"]["end_date"] == original_end
 
 
+# --- GET /events/registrations/my ---
+
+
+@pytest.mark.asyncio
+async def test_my_registrations_returns_only_the_callers_own(
+    client: AsyncClient, admin_token: str, student_token: str, other_student_token: str
+):
+    event = await create_event(client, admin_token)
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(other_student_token))
+
+    mine = await client.get(f"{BASE}/registrations/my", headers=auth_header(student_token))
+    assert mine.status_code == 200
+    rows = mine.json()["data"]
+    assert len(rows) == 1
+    assert rows[0]["event_id"] == event["id"]
+    assert rows[0]["event_title"] == event["title"]
+    assert rows[0]["status"] == "CONFIRMED"
+
+    assert (await client.get(f"{BASE}/registrations/my")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_my_registrations_still_work_after_the_deadline(
+    client: AsyncClient,
+    db_session,
+    admin_token: str,
+    student_token: str,
+    other_student_token: str,
+    student_user: User,
+):
+    """The whole point of gap 1: closed sign-ups must not hide your own place."""
+    event = await create_event(client, admin_token)
+    registered = await client.post(
+        f"{BASE}/{event['id']}/register", headers=auth_header(student_token)
+    )
+    assert registered.status_code == 200
+
+    # Move the deadline and the start date into the past. Going through the API
+    # is impossible: EventCreate and EventUpdate both reject past dates.
+    now = datetime.now(timezone.utc)
+    stored = (await db_session.execute(select(Event).where(Event.id == event["id"]))).scalar_one()
+    stored.registration_deadline = now - timedelta(days=2)
+    stored.start_date = now - timedelta(days=1)
+    stored.end_date = now - timedelta(hours=20)
+    await db_session.commit()
+
+    mine = await client.get(f"{BASE}/registrations/my", headers=auth_header(student_token))
+    assert mine.status_code == 200
+    assert len(mine.json()["data"]) == 1
+    assert mine.json()["data"][0]["student_id"] == student_user.id
+
+    # Registering afresh is still closed, which is the behaviour being preserved:
+    # the deadline blocks new sign-ups, it does not hide existing ones.
+    late = await client.post(
+        f"{BASE}/{event['id']}/register", headers=auth_header(other_student_token)
+    )
+    assert late.status_code == 400
+    assert late.json()["message"] == "Registration deadline has passed"
+
+
+@pytest.mark.asyncio
+async def test_my_registrations_hides_the_link_unless_confirmed(
+    client: AsyncClient, admin_token: str, student_token: str, other_student_token: str
+):
+    created = await client.post(
+        BASE, json=virtual_event_payload(max_participants=1), headers=auth_header(admin_token)
+    )
+    event_id = created.json()["data"]["id"]
+    await client.post(f"{BASE}/{event_id}/register", headers=auth_header(student_token))
+    await client.post(f"{BASE}/{event_id}/register", headers=auth_header(other_student_token))
+
+    confirmed = await client.get(f"{BASE}/registrations/my", headers=auth_header(student_token))
+    assert confirmed.json()["data"][0]["virtual_link"] == "https://meet.example.com/secret-room"
+
+    waitlisted = await client.get(
+        f"{BASE}/registrations/my", headers=auth_header(other_student_token)
+    )
+    assert waitlisted.json()["data"][0]["status"] == "WAITLISTED"
+    assert waitlisted.json()["data"][0]["virtual_link"] is None
+
+
+# --- DELETE /events/{id}/register ---
+
+
+@pytest.mark.asyncio
+async def test_cancelling_a_confirmed_place_promotes_the_first_waitlisted_student(
+    client: AsyncClient, admin_token: str, student_token: str, other_student_token: str,
+    other_student_user: User,
+):
+    event = await create_event(client, admin_token, max_participants=1)
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    waitlisted = await client.post(
+        f"{BASE}/{event['id']}/register", headers=auth_header(other_student_token)
+    )
+    assert waitlisted.json()["data"]["status"] == "WAITLISTED"
+
+    cancelled = await client.delete(
+        f"{BASE}/{event['id']}/register", headers=auth_header(student_token)
+    )
+    assert cancelled.status_code == 200
+    body = cancelled.json()["data"]
+    assert body["registration"]["status"] == "CANCELLED"
+    assert body["promoted_student_id"] == other_student_user.id
+
+    promoted = await client.get(
+        f"{BASE}/registrations/my", headers=auth_header(other_student_token)
+    )
+    assert promoted.json()["data"][0]["status"] == "CONFIRMED"
+
+    # The freed place is accounted for, not double-counted.
+    detail = await client.get(f"{BASE}/{event['id']}")
+    assert detail.json()["data"]["confirmed_count"] == 1
+    assert detail.json()["data"]["spots_left"] == 0
+
+
+@pytest.mark.asyncio
+async def test_cancelling_a_waitlisted_place_promotes_nobody(
+    client: AsyncClient, admin_token: str, student_token: str, other_student_token: str
+):
+    event = await create_event(client, admin_token, max_participants=1)
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(other_student_token))
+
+    cancelled = await client.delete(
+        f"{BASE}/{event['id']}/register", headers=auth_header(other_student_token)
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.json()["data"]["promoted_student_id"] is None
+
+    # The confirmed student is untouched.
+    detail = await client.get(f"{BASE}/{event['id']}")
+    assert detail.json()["data"]["confirmed_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_cancel_rejects_second_attempt_and_unregistered_callers(
+    client: AsyncClient, admin_token: str, student_token: str, other_student_token: str
+):
+    event = await create_event(client, admin_token)
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+
+    first = await client.delete(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    assert first.status_code == 200
+
+    again = await client.delete(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    assert again.status_code == 409
+
+    never = await client.delete(
+        f"{BASE}/{event['id']}/register", headers=auth_header(other_student_token)
+    )
+    assert never.status_code == 404
+
+    assert (await client.delete(f"{BASE}/{event['id']}/register")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_student_can_register_again(
+    client: AsyncClient, admin_token: str, student_token: str
+):
+    """The unique constraint would otherwise lock a student out permanently."""
+    event = await create_event(client, admin_token, max_participants=1)
+    headers = auth_header(student_token)
+    await client.post(f"{BASE}/{event['id']}/register", headers=headers)
+    await client.delete(f"{BASE}/{event['id']}/register", headers=headers)
+
+    again = await client.post(f"{BASE}/{event['id']}/register", headers=headers)
+    assert again.status_code == 200
+    assert again.json()["data"]["status"] == "CONFIRMED"
+
+    # Still one row, not two -- the cancelled row was revived.
+    mine = await client.get(f"{BASE}/registrations/my", headers=headers)
+    assert len(mine.json()["data"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_rejoining_a_full_event_lands_on_the_waitlist(
+    client: AsyncClient, admin_token: str, student_token: str, other_student_token: str
+):
+    event = await create_event(client, admin_token, max_participants=1)
+    mine = auth_header(student_token)
+    await client.post(f"{BASE}/{event['id']}/register", headers=mine)
+
+    # Cancelling promotes the other student into the only place.
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(other_student_token))
+    await client.delete(f"{BASE}/{event['id']}/register", headers=mine)
+
+    rejoined = await client.post(f"{BASE}/{event['id']}/register", headers=mine)
+    assert rejoined.status_code == 200
+    assert rejoined.json()["data"]["status"] == "WAITLISTED"
+
+
+# --- POST /events/{id}/restore ---
+
+
+@pytest.mark.asyncio
+async def test_restore_brings_a_deleted_event_back(
+    client: AsyncClient, admin_token: str, student_token: str
+):
+    event = await create_event(client, admin_token)
+    await client.post(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    await client.delete(f"{BASE}/{event['id']}", headers=auth_header(admin_token))
+    assert (await client.get(f"{BASE}/{event['id']}")).status_code == 404
+
+    restored = await client.post(
+        f"{BASE}/{event['id']}/restore", headers=auth_header(admin_token)
+    )
+    assert restored.status_code == 200
+    assert restored.json()["data"]["id"] == event["id"]
+
+    assert (await client.get(f"{BASE}/{event['id']}")).status_code == 200
+    # Registrations survive a soft delete, so they come back with the event.
+    assert (await client.get(f"{BASE}/{event['id']}")).json()["data"]["confirmed_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_restore_rejects_a_live_event_and_non_admins(
+    client: AsyncClient, admin_token: str, student_token: str
+):
+    event = await create_event(client, admin_token)
+
+    live = await client.post(f"{BASE}/{event['id']}/restore", headers=auth_header(admin_token))
+    assert live.status_code == 400
+    assert live.json()["message"] == "Event is not deleted"
+
+    await client.delete(f"{BASE}/{event['id']}", headers=auth_header(admin_token))
+    assert (
+        await client.post(f"{BASE}/{event['id']}/restore", headers=auth_header(student_token))
+    ).status_code == 403
+    assert (await client.post(f"{BASE}/{event['id']}/restore")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_include_deleted_is_admin_only(
+    client: AsyncClient, admin_token: str, student_token: str
+):
+    event = await create_event(client, admin_token)
+    await client.delete(f"{BASE}/{event['id']}", headers=auth_header(admin_token))
+
+    hidden = await client.get(BASE)
+    assert hidden.json()["data"]["total"] == 0
+
+    found = await client.get(f"{BASE}?include_deleted=true", headers=auth_header(admin_token))
+    assert found.status_code == 200
+    assert [item["id"] for item in found.json()["data"]["items"]] == [event["id"]]
+
+    assert (
+        await client.get(f"{BASE}?include_deleted=true", headers=auth_header(student_token))
+    ).status_code == 403
+    assert (await client.get(f"{BASE}?include_deleted=true")).status_code == 403
+
+
 @pytest.mark.asyncio
 async def test_participants_are_admin_only(
     client: AsyncClient, admin_token: str, student_token: str
