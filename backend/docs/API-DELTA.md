@@ -192,3 +192,77 @@ would mistake for the full one.
 
 Without this, `POST /{id}/restore` would only be usable by an admin who already knew the id of the
 event they had deleted.
+
+---
+
+## §4.2 Article — three columns beyond the document
+
+**Document:** `id`, `title`, `slug`, `content`, `excerpt`, `cover_image_url`, `status`
+(`DRAFT / PUBLISHED / ARCHIVED`), `tags`, `author_id`, `published_at`.
+
+**Implementation:** all of the above, implemented as specified, plus:
+
+| Column | Why |
+|---|---|
+| `created_at` | Every other model in the schema has it; used as the list tiebreaker. |
+| `updated_at` | Every other model has it. |
+| `deleted_at` | §4.3 forbids hard-deleting a user's articles, and §5.6 defines a DELETE route. Soft deletion is the only way to honour both. |
+
+`author_id` is also now a real foreign key to `users.id`. The previous stand-in table stored it as a
+bare string with no constraint.
+
+**`deleted_at` is deliberately separate from `status = ARCHIVED`.** Archiving is an editorial act — the
+author took a published piece down and may put it back — whereas deleting is removal. Collapsing the
+two would make "unpublish" and "delete" the same operation and leave no way to undo either
+distinctly.
+
+**`published_at` is stamped once**, at the first transition to `PUBLISHED`, and never moved again.
+Re-publishing an archived article keeps the original date, so an edit years later cannot jump the
+piece back to the top of the public list, which is ordered by that column.
+
+---
+
+## §5.6 Articles — implemented as specified, with two clarifications
+
+The five routes match the document exactly, including being keyed by `slug` rather than id. Two
+behaviours the document does not state:
+
+- **An unpublished article returns `404`, not `403`,** to anyone who is not its author or an admin.
+  The slug is derived from the title, so a `403` would confirm that a draft with a guessable title
+  exists at that address. The list route excludes drafts and archived pieces entirely, as §5.6's
+  "List published articles" requires.
+- **`slug` is derived, never supplied.** `ArticleCreateRequest` has no `slug` field. A repeated title
+  gets `-2`, `-3` … appended. Renaming an article moves its slug, so any external link to the old
+  slug breaks — worth knowing before the frontend starts publishing article URLs. The check is a
+  check-then-insert, so two simultaneous creates with the same title can still collide on the unique
+  index; the loser gets a `409` to retry rather than a mangled slug.
+
+Two additive query parameters on the list route, neither in the document: `tag` and `author_id`.
+Note that `tag` is applied **after** pagination, because JSON containment is not portable between
+SQLite and Postgres — so it narrows the current page rather than the whole result set. If tag
+browsing becomes a primary route, it needs a real index and a proper query.
+
+---
+
+## §5.7 Admin — `total_articles` excludes deleted articles
+
+Same change and the same reason as `total_events`: articles are now soft-deleted, so the bare row
+count would include articles no route will serve.
+
+---
+
+## Migration `a1b4e7c90d62`
+
+Brings the four-column stand-in table up to the full shape. Existing rows are backfilled with a slug
+derived from their title, numbered on collision.
+
+The backfill duplicates the logic of `app/core/slug.py` rather than importing it: a migration must
+keep producing the same output forever, and importing application code would let a later refactor
+silently change what a historical migration does. The duplication was verified against
+`slugify()` — including the NFKD transliteration, without which "Ampères & Ohms" backfills as
+`ampères-ohms` while the running app generates `amperes-ohms`.
+
+**Verified on SQLite only**: upgrade, backfill with duplicate and non-ASCII titles, downgrade and
+re-upgrade all succeed. The Docker daemon was unavailable, so the Postgres branch — the
+`DO $$ … pg_type` block that creates the `articlestatus` enum — has **not** been executed. Run
+`alembic upgrade head` against Postgres before merging.
