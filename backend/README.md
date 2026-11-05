@@ -87,6 +87,11 @@ always catch everything (e.g. some enum or index changes).
   `published_at` is stamped once at first publication so later edits do not
   reorder the list.
 - `Hardware`/`HardwareLoan` models (needed for the admin loans endpoints).
+- **Loan withdrawal**: `POST /api/v1/hardware/loans/{loan_id}/cancel` lets a
+  borrower withdraw their own *pending* request, recorded as `CANCELLED` so the
+  history keeps it distinct from an admin's `REJECTED`. Availability is
+  untouched (a pending loan never held a unit), and cancelling releases the
+  duplicate-request block so the same item can be requested again.
 
 ## Not implemented here (other verticals / later milestones)
 

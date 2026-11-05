@@ -266,3 +266,66 @@ silently change what a historical migration does. The duplication was verified a
 re-upgrade all succeed. The Docker daemon was unavailable, so the Postgres branch — the
 `DO $$ … pg_type` block that creates the `articlestatus` enum — has **not** been executed. Run
 `alembic upgrade head` against Postgres before merging.
+
+---
+
+## §4.2 HardwareLoan / §5.4 Hardware — borrowers can withdraw a request
+
+**Document:** `status` is `enum: PENDING / APPROVED / RETURNED / REJECTED`. §5.4 lists no route for a
+borrower to withdraw their own request.
+
+**Implementation:** a fifth status, `CANCELLED`, and one new route:
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/hardware/loans/{loan_id}/cancel` | authenticated (borrower only) | Withdraw your own pending request |
+
+Add the status to §4.2's HardwareLoan row and the route to §5.4. The route must stay declared **above**
+`/{hardware_id}`, inside the existing loans block, or `loans` matches as a hardware id — the file
+already carries a comment saying so.
+
+**Why a new value rather than reusing `REJECTED`.** `REJECTED` is an admin's decision; `CANCELLED` is
+the student's own. Collapsing them would make `GET /admin/loans` misreport a withdrawal as a refusal,
+which is precisely the distinction the loan history exists to record. No approver is written on a
+cancellation, because nobody approved or refused anything.
+
+**What it unblocks.** `ACTIVE_LOAN_STATES` in `app/services/loans.py` is `(PENDING, APPROVED)` and is
+what stops duplicate requests for the same item. Until this route existed, a student's own pending
+request blocked them from re-requesting until an admin acted. `CANCELLED` is outside that tuple, so
+cancelling releases the block — covered by
+`test_cancelling_releases_the_duplicate_request_block`.
+
+**Availability is untouched.** A pending loan never held a unit, because units move on approval
+(`request_loan`). Cancelling therefore must not increment `available_quantity`, for exactly the reason
+`reject_loan` does not.
+
+**Ownership is checked before state.** A student probing someone else's loan id gets `403` whatever
+the loan's status, so the response cannot be used to tell a pending request from an approved one. An
+admin also gets `403`: admins reject, they do not withdraw a request on a student's behalf.
+
+- `403` for anyone but the borrower, `401` with no token.
+- `400` ("Loan is not pending") for an approved, returned, rejected or already-cancelled loan — an
+  approved loan is returned, not cancelled.
+- `404` for an unknown loan id.
+
+### Migration `c3d8f1a60b47`
+
+The two dialects need different work. Postgres gets
+`ALTER TYPE loanstatus ADD VALUE IF NOT EXISTS 'CANCELLED'`, which is transactional from PG 12 and so
+safe on the PG 15+ that §3 mandates. SQLite has no enum type: SQLAlchemy renders `Enum` as a plain
+`VARCHAR`, so the column is rebuilt through `batch_alter_table`, widening it from `VARCHAR(8)` to
+`VARCHAR(9)`.
+
+Worth knowing while reading this: SQLAlchemy's `Enum` does **not** emit a `CHECK` constraint by
+default, so on SQLite the column accepts any string at all. That is true of every enum in this schema
+already, not something this change introduced — but it means the test suite cannot catch an invalid
+status value, and only Postgres actually enforces the set.
+
+**The downgrade refuses rather than guessing.** Postgres cannot drop an enum label in place, so the
+type is recreated; but either dialect leaves rows whose `CANCELLED` status has no home in the old set.
+Mapping them to `REJECTED` would rewrite a student's withdrawal as an admin's refusal, so the
+downgrade raises and names the count instead, leaving the decision to the operator.
+
+**Verified on SQLite only**: upgrade, inserting a `CANCELLED` row, the downgrade guard refusing while
+such a row exists, the downgrade succeeding once it is removed, and re-upgrade. The Postgres branch —
+both the `ALTER TYPE` and the type recreation in the downgrade — has **not** been executed.

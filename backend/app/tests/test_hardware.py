@@ -749,3 +749,167 @@ async def test_retired_item_cannot_be_borrowed(
         f"{BASE}/{item.id}/loan", json={"purpose": "too late"}, headers=auth_header(student_token)
     )
     assert resp.status_code == 400
+
+
+# --- POST /hardware/loans/{loan_id}/cancel -------------------------------
+
+
+async def _request_loan(client: AsyncClient, item_id: str, token: str) -> dict:
+    resp = await client.post(
+        f"{BASE}/{item_id}/loan",
+        json={
+            "purpose": "Capstone lab use",
+            "expected_return_date": (
+                datetime.now(timezone.utc) + timedelta(days=3)
+            ).isoformat(),
+        },
+        headers=auth_header(token),
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["data"]
+
+
+async def test_borrower_cancels_own_pending_request(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
+    item = await seed_hardware(db_session, name="Cancellable Scope", quantity=2)
+    loan = await _request_loan(client, item.id, student_token)
+
+    resp = await client.post(
+        f"{BASE}/loans/{loan['id']}/cancel", headers=auth_header(student_token)
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "success"
+    assert body["data"]["status"] == "CANCELLED"
+    # Nobody approved or refused it, so no approver is recorded.
+    assert body["data"]["approved_by_id"] is None
+    assert body["data"]["approval_date"] is None
+
+    stored = await db_session.get(HardwareLoan, loan["id"])
+    assert stored.status is LoanStatus.CANCELLED
+
+
+async def test_cancelling_does_not_touch_availability(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
+    """A pending loan never held a unit, so cancelling must not return one."""
+    item = await seed_hardware(db_session, name="Counted Scope", quantity=2)
+    # Held before expire_all() below: accessing item.id afterwards would trigger
+    # a lazy refresh from sync context and raise MissingGreenlet.
+    item_id = item.id
+    loan = await _request_loan(client, item_id, student_token)
+
+    before = (await db_session.get(Hardware, item_id)).available_quantity
+    assert before == 2
+
+    resp = await client.post(
+        f"{BASE}/loans/{loan['id']}/cancel", headers=auth_header(student_token)
+    )
+    assert resp.status_code == 200
+
+    db_session.expire_all()
+    after = (await db_session.get(Hardware, item_id)).available_quantity
+    assert after == 2
+
+
+async def test_cancelling_releases_the_duplicate_request_block(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
+    """The point of the gap: a dead request must stop blocking the student."""
+    item = await seed_hardware(db_session, name="Rerequest Scope", quantity=2)
+    first = await _request_loan(client, item.id, student_token)
+
+    # Blocked while the request is still pending.
+    blocked = await client.post(
+        f"{BASE}/{item.id}/loan", json={"purpose": "again"}, headers=auth_header(student_token)
+    )
+    assert blocked.status_code == 400
+
+    cancelled = await client.post(
+        f"{BASE}/loans/{first['id']}/cancel", headers=auth_header(student_token)
+    )
+    assert cancelled.status_code == 200
+
+    again = await _request_loan(client, item.id, student_token)
+    assert again["status"] == "PENDING"
+    assert again["id"] != first["id"]
+
+
+async def test_cancel_is_refused_to_other_students_and_strangers(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    student_token: str,
+    other_student_user: User,
+):
+    item = await seed_hardware(db_session, name="Guarded Scope", quantity=2)
+    loan = await _request_loan(client, item.id, student_token)
+
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": other_student_user.email, "password": "StrongPass2"},
+    )
+    other_token = login.json()["data"]["access_token"]
+
+    forbidden = await client.post(
+        f"{BASE}/loans/{loan['id']}/cancel", headers=auth_header(other_token)
+    )
+    assert forbidden.status_code == 403
+    assert forbidden.json()["status"] == "error"
+
+    assert (await client.post(f"{BASE}/loans/{loan['id']}/cancel")).status_code == 401
+
+    # Still pending after both refusals.
+    stored = await db_session.get(HardwareLoan, loan["id"])
+    assert stored.status is LoanStatus.PENDING
+
+
+async def test_admin_cannot_cancel_someone_elses_request(
+    client: AsyncClient, db_session: AsyncSession, student_token: str, admin_token: str
+):
+    """Admins reject; they do not withdraw a student's request on their behalf."""
+    item = await seed_hardware(db_session, name="Admin Scope", quantity=2)
+    loan = await _request_loan(client, item.id, student_token)
+
+    resp = await client.post(
+        f"{BASE}/loans/{loan['id']}/cancel", headers=auth_header(admin_token)
+    )
+    assert resp.status_code == 403
+
+
+async def test_cannot_cancel_an_approved_or_unknown_loan(
+    client: AsyncClient, db_session: AsyncSession, student_token: str, admin_token: str
+):
+    item = await seed_hardware(db_session, name="Approved Scope", quantity=2)
+    loan = await _request_loan(client, item.id, student_token)
+
+    approved = await client.put(
+        f"/api/v1/admin/loans/{loan['id']}/approve", headers=auth_header(admin_token)
+    )
+    assert approved.status_code == 200
+
+    # An approved loan is returned, not cancelled -- the unit is already out.
+    resp = await client.post(
+        f"{BASE}/loans/{loan['id']}/cancel", headers=auth_header(student_token)
+    )
+    assert resp.status_code == 400
+    assert resp.json()["message"] == "Loan is not pending"
+
+    unknown = await client.post(
+        f"{BASE}/loans/no-such-loan/cancel", headers=auth_header(student_token)
+    )
+    assert unknown.status_code == 404
+    assert unknown.json() == {"status": "error", "message": "Loan not found", "data": None}
+
+
+async def test_cancelled_loan_appears_in_my_history(
+    client: AsyncClient, db_session: AsyncSession, student_token: str
+):
+    item = await seed_hardware(db_session, name="History Scope", quantity=2)
+    loan = await _request_loan(client, item.id, student_token)
+    await client.post(f"{BASE}/loans/{loan['id']}/cancel", headers=auth_header(student_token))
+
+    resp = await client.get(f"{BASE}/loans/my", headers=auth_header(student_token))
+    assert resp.status_code == 200
+    rows = resp.json()["data"]
+    assert [row["status"] for row in rows if row["id"] == loan["id"]] == ["CANCELLED"]

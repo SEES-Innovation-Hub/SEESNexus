@@ -160,6 +160,41 @@ async def reject_loan(db: AsyncSession, loan: HardwareLoan, admin: User) -> Hard
     return loan
 
 
+async def cancel_loan(db: AsyncSession, loan: HardwareLoan, borrower: User) -> HardwareLoan:
+    """The borrower withdraws their own pending request.
+
+    Like reject_loan, the counter is untouched: a pending loan never held a unit,
+    because units move on approval (see request_loan). Unlike reject_loan, this
+    is the student's own decision, so the status is CANCELLED rather than
+    REJECTED and no approver is recorded -- nobody approved or refused anything.
+
+    Because ACTIVE_LOAN_STATES covers only PENDING and APPROVED, cancelling also
+    releases the duplicate-request block, so the student can ask for the same
+    item again.
+    """
+    loan = (
+        await db.execute(
+            select(HardwareLoan).where(HardwareLoan.id == loan.id).with_for_update()
+        )
+    ).scalar_one()
+
+    # Ownership before state: a student poking at someone else's loan id should
+    # not be able to tell a pending request from an approved one.
+    if loan.borrower_id != borrower.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only cancel your own loan request",
+        )
+    # An approved loan is returned, not cancelled -- the unit is already out.
+    _assert_pending(loan)
+
+    loan.status = LoanStatus.CANCELLED
+
+    await db.commit()
+    await db.refresh(loan)
+    return loan
+
+
 async def return_loan(db: AsyncSession, loan: HardwareLoan) -> HardwareLoan:
     """Give the unit back. Who may call this is the route's decision, not ours."""
     loan = (
