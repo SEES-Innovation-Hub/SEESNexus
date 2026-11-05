@@ -10,6 +10,9 @@ python-jose[cryptography]==3.5.0
 bcrypt==5.0.0
 python-multipart==0.0.32
 cloudinary==1.44.0
+# Tech Doc §3 names sib-api-v3-sdk; Brevo replaced it with this package, which
+# imports as `brevo` and provides a native async client.
+brevo-python==5.1.0
 
 # --- test dependencies ---
 pytest==9.1.1
