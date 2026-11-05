@@ -61,7 +61,11 @@ always catch everything (e.g. some enum or index changes).
 ## What's implemented here
 
 - **Auth vertical**: `/api/v1/auth/{register,login,refresh,validate/token,me}`,
-  `/api/v1/notify/{send-code,verify-code}` (OTP-gated registration)
+  `/api/v1/notify/{send-code,verify-code}` (OTP-gated registration). Codes are
+  emailed through Brevo when `BREVO_API_KEY` is set; without it the code comes
+  back in the `/notify/send-code` response as `debug_code` so local development
+  works offline. That field is suppressed whenever a key is present, since
+  handing the code to the caller would defeat the verification it gates.
 - **Admin vertical**: `/api/v1/admin/{dashboard,users,users/{id}/role,users/{id}
   (deactivate),loans,loans/{id}/approve,loans/{id}/reject}`
 - **Projects vertical**: `/api/v1/projects` — public paginated list (filterable

@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+from app.core.config import settings
+from app.services import email
 from app.tests.conftest import auth_header
 
 pytestmark = pytest.mark.asyncio
@@ -45,6 +47,64 @@ async def test_verify_code_rejects_wrong_code(client: AsyncClient):
     )
     assert resp.status_code == 400
     assert resp.json()["status"] == "error"
+
+
+async def test_send_code_emails_the_code_it_issued(client: AsyncClient, monkeypatch):
+    """The emailed code must be the one stored, or verification can never succeed."""
+    sent: list[tuple[str, str]] = []
+
+    async def _fake_send(to_email: str, code: str) -> bool:
+        sent.append((to_email, code))
+        return True
+
+    monkeypatch.setattr(email, "send_otp_email", _fake_send)
+
+    resp = await client.post("/api/v1/notify/send-code", json={"email": "mailed@unilag.edu.ng"})
+    assert resp.status_code == 200
+    assert len(sent) == 1
+
+    to_email, code = sent[0]
+    assert to_email == "mailed@unilag.edu.ng"
+    # Brevo is unconfigured in tests, so the code also comes back in the body.
+    assert code == resp.json()["data"]["debug_code"]
+
+    # And it is the code the database will accept.
+    verify = await client.post(
+        "/api/v1/notify/verify-code", json={"email": "mailed@unilag.edu.ng", "code": code}
+    )
+    assert verify.status_code == 200
+
+
+async def test_send_code_withholds_debug_code_once_brevo_is_configured(
+    client: AsyncClient, monkeypatch
+):
+    """Returning the code to a caller that can be emailed it would defeat the check."""
+
+    async def _fake_send(to_email: str, code: str) -> bool:
+        return True
+
+    monkeypatch.setattr(settings, "BREVO_API_KEY", "test-key")
+    monkeypatch.setattr(email, "send_otp_email", _fake_send)
+
+    resp = await client.post("/api/v1/notify/send-code", json={"email": "live@unilag.edu.ng"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "success"
+    assert "debug_code" not in body["data"]
+
+
+async def test_send_code_returns_502_when_the_email_fails(client: AsyncClient, monkeypatch):
+    async def _failing_send(to_email: str, code: str) -> bool:
+        raise email.EmailSendError("brevo is down")
+
+    monkeypatch.setattr(settings, "BREVO_API_KEY", "test-key")
+    monkeypatch.setattr(email, "send_otp_email", _failing_send)
+
+    resp = await client.post("/api/v1/notify/send-code", json={"email": "down@unilag.edu.ng"})
+    assert resp.status_code == 502
+    body = resp.json()
+    assert body["status"] == "error"
+    assert body["data"] is None
 
 
 # --- /auth/register ---
