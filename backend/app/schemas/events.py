@@ -65,6 +65,15 @@ class EventResponse(BaseModel):
     created_by_id: str
     created_at: datetime
 
+    # Filled by _event_response() in api/v1/events.py, which is the only place
+    # allowed to build this model: the counts come from the registrations, not
+    # from a column, and virtual_link is withheld from callers who are not
+    # entitled to it. They default rather than being required so that
+    # model_validate() can still read an Event ORM instance directly.
+    confirmed_count: int = 0
+    # None means unlimited, matching max_participants (Tech Doc §4.2).
+    spots_left: int | None = None
+
 
 class EventRegistrationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -79,6 +88,22 @@ class EventRegistrationResponse(BaseModel):
 class EventParticipantResponse(EventRegistrationResponse):
     student_name: str
     student_email: str
+
+
+class MyRegistrationResponse(EventRegistrationResponse):
+    """One of the caller's own registrations, with enough of the event to render it.
+
+    Carries the event fields the "my events" screen needs so it does not have to
+    fetch each event separately. virtual_link follows the same rule as
+    EventResponse: it is filled only for a CONFIRMED registration.
+    """
+
+    event_title: str
+    start_date: datetime
+    end_date: datetime
+    location: str
+    is_virtual: bool
+    virtual_link: str | None = None
 
 
 class PaginatedEventsResponse(BaseModel):

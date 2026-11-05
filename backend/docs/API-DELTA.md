@@ -1,0 +1,331 @@
+# API deltas against Technical Documentation v2
+
+§13 of the tech doc requires the document to be updated in the same PR as any schema or contract
+change. The document itself is a PDF that cannot be edited from the repo, so each change is recorded
+here for whoever holds the source file.
+
+Each entry states the section affected, what the document says now, and what the running system does.
+
+---
+
+## §3 Tech Stack — Brevo SDK name
+
+**Document:** "Brevo (sib-api-v3-sdk) — Transactional email/OTP".
+
+**Implementation:** `brevo-python==5.1.0`.
+
+Brevo replaced `sib-api-v3-sdk` with `brevo-python`. Two details matter to anyone reading the code:
+the 5.x package imports as **`brevo`**, not `brevo_python`, and it ships a native async client
+(`AsyncBrevo`), so the send is awaited directly rather than being pushed through a threadpool.
+
+No route or schema is affected. Suggested replacement text for the table cell:
+`Brevo (brevo-python; imports as brevo)`.
+
+---
+
+## §5.2 Notify — `/notify/send-code` response and failure modes
+
+**Document:** "POST /send-code — Send OTP to email". No response body or error cases given.
+
+**Implementation:**
+
+- On success, `data` is `{"email": "<address>"}`.
+- `data.debug_code` is included **only** when `OTP_DEBUG_RETURN_CODE` is true *and* `BREVO_API_KEY`
+  is empty. Previously the flag alone controlled it, which meant a configured deployment handed the
+  caller the secret it was about to test them on — anyone could have verified an address they did not
+  own. The field now cannot appear in any environment that can send email.
+- `502` when Brevo is configured and the send fails, with the standard error envelope and the message
+  "Could not send the verification code. Please try again." The verification-code row is committed
+  before the send is attempted, so a retry is safe.
+- `message` distinguishes the two success paths: "Verification code sent" when email went out, and
+  "Verification code generated, but email is not configured" otherwise, so a misconfigured deployment
+  is loud rather than silently useless.
+
+**Frontend impact:** `frontend/src/api/auth.ts` already types `debug_code` as optional, so no change
+is required there. Any registration flow that depended on reading `debug_code` will stop working
+against a deployment with a Brevo key — which is the intended behaviour.
+
+---
+
+## §4.2 Event / §5.5 Events — `virtual_link` visibility
+
+**Document:** §4.2 lists `virtual_link` as "string, nullable" with no visibility rule. §5.5 gives
+`GET /` and `GET /{id}` an Auth of "none".
+
+**Implementation:** both routes remain public, exactly as §5.5 requires. `virtual_link` is returned as
+`null` unless the caller is an `ADMIN` or holds a `CONFIRMED` registration for that event.
+
+The document is silent on who may see the link, so withholding it contradicts nothing — but the
+silence is worth closing explicitly, because the previous behaviour published a joinable meeting URL
+to every anonymous visitor the moment an admin created the event. A **waitlisted** student is
+deliberately excluded: they hold no place, which is the distinction waitlisting exists to draw.
+
+Suggested addition to the §4.2 Event row: `virtual_link — string, nullable; returned only to an admin
+or a confirmed registrant`.
+
+---
+
+## §5.5 Events — two new response fields
+
+**Document:** no response schema is given for the event routes beyond the §4.2 column list.
+
+**Implementation:** `EventResponse` gains two derived fields, on both the list and the detail route:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `confirmed_count` | int | Registrations with status `CONFIRMED`. Waitlisted and cancelled rows are not counted. |
+| `spots_left` | int \| null | `max_participants - confirmed_count`, floored at 0. `null` when `max_participants` is `null`, matching §4.2's "nullable = unlimited". |
+
+Both are additive, so no existing client breaks.
+
+---
+
+## §5.5 Events — new `upcoming` query parameter
+
+**Document:** `GET /` is described only as "List events".
+
+**Implementation:** `upcoming=true` restricts the list to events whose `start_date` has not passed.
+Default is `false`, so the unfiltered behaviour is unchanged. The existing ordering
+(`start_date` ascending) already suits the filter, so no sort parameter was added.
+
+---
+
+## §5.7 Admin — `total_events` excludes deleted events
+
+**Document:** `GET /dashboard` — "Aggregate stats".
+
+**Implementation:** `total_events` now counts only events with `deleted_at IS NULL`. Events are
+soft-deleted, so the previous bare row count included events that no route will serve and that no
+admin can see. `total_articles` has the same problem and will be fixed when Articles gains its
+`deleted_at` column.
+
+---
+
+## §5.5 Events — `PUT /{id}` rejects an under-sized `max_participants`
+
+**Document:** `PUT /{id}` — "Update event". No validation rules given.
+
+**Implementation:** `400` when `max_participants` is set below the current `CONFIRMED` count, with the
+count in the message. Lowering it would leave the event oversubscribed with no rule for whose place
+was forfeited. This mirrors the existing guard in `adjust_total_quantity`
+(`app/services/loans.py`), which refuses to drop a hardware quantity below the units on loan.
+
+**Related fix, not a contract change.** The check is performed against the request payload *before*
+any value is assigned to the event. Assigning first and validating afterwards is unsafe here: any
+query issued after the assignment triggers a SQLAlchemy autoflush that writes the pending value, so a
+rejected update could still reach the database. The pre-existing date validation
+(`_validate_event_dates`) had the same shape and now rolls back explicitly before raising;
+`test_rejected_date_update_does_not_persist` covers it and was confirmed to fail without the rollback.
+
+---
+
+## §5.5 Events — three new routes
+
+The document's §5.5 table lists seven routes. Three more are implemented, all additive:
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/events/registrations/my` | authenticated | The caller's own registrations |
+| DELETE | `/events/{id}/register` | authenticated | Cancel a registration |
+| POST | `/events/{id}/restore` | admin | Undo a soft delete |
+
+These rows should be added to §5.5. Note that `/events/registrations/my` must stay declared above
+`GET /{event_id}` in the router, or FastAPI matches `registrations` as an event id.
+
+### `GET /events/registrations/my`
+
+Returns every registration held by the caller, **whatever its status and regardless of the
+registration deadline or the event date**. A student needs to see what they signed up for most of all
+once sign-ups have closed, which is precisely when the rest of the API stops being helpful about it.
+Cancelled rows are included so a screen can show that a place was given up, rather than the row
+vanishing. Registrations belonging to a soft-deleted event are excluded.
+
+Each row carries the registration fields plus `event_title`, `start_date`, `end_date`, `location`,
+`is_virtual` and `virtual_link`, so the screen needs no second request per event. `virtual_link`
+follows the same rule as `EventResponse`: filled only for a `CONFIRMED` registration.
+
+### `DELETE /events/{id}/register`
+
+Sets the caller's registration to `CANCELLED` and, **if it had been `CONFIRMED`**, promotes the
+longest-waiting `WAITLISTED` registration to `CONFIRMED` in the same transaction. A waitlisted student
+cancelling promotes nobody, since they occupied no place.
+
+Response `data` is `{"registration": {...}, "promoted_student_id": "<uuid>" | null}`, so a client can
+tell whether someone moved up without re-reading the participant list.
+
+- `404` when the caller has no registration for that event.
+- `409` when it is already cancelled.
+
+The event row is locked `FOR UPDATE` for the duration, so two simultaneous cancellations cannot
+promote the same waitlisted student twice.
+
+### `POST /events/{id}/restore`
+
+Clears `deleted_at`. `400` if the event is not deleted. Registrations already survive a soft delete,
+so a restored event returns with its sign-ups intact. This is the first caller of the
+`include_deleted` flag that `_get_event_or_404` has always accepted.
+
+---
+
+## §4.2 EventRegistration — `CANCELLED` is now reachable
+
+**Document:** `status` is `enum: CONFIRMED / WAITLISTED / CANCELLED`.
+
+**Implementation:** no schema change — the value was already defined but no route had ever written it.
+Two behaviours follow from it now being reachable:
+
+- **A cancelled registration is revived, not duplicated.** `uq_event_registration_student` permits one
+  row per student per event, so `POST /{id}/register` by a student whose row is `CANCELLED` flips that
+  row back to `CONFIRMED` (or `WAITLISTED` if the event is full) instead of returning 409. Without
+  this, cancelling once would lock a student out of the event permanently.
+- **`registered_at` is reset on revival**, so anyone who joined the waitlist while the student was
+  away keeps their place ahead of the returning student.
+
+---
+
+## §5.5 Events — new `include_deleted` query parameter
+
+`GET /events?include_deleted=true` also returns soft-deleted events. Restricted to admins: `401`
+without credentials, `403` for any non-admin role, matching `get_current_user` and `require_roles`
+elsewhere. The flag is refused rather than ignored, so a caller is never handed a filtered list they
+would mistake for the full one.
+
+Without this, `POST /{id}/restore` would only be usable by an admin who already knew the id of the
+event they had deleted.
+
+---
+
+## §4.2 Article — three columns beyond the document
+
+**Document:** `id`, `title`, `slug`, `content`, `excerpt`, `cover_image_url`, `status`
+(`DRAFT / PUBLISHED / ARCHIVED`), `tags`, `author_id`, `published_at`.
+
+**Implementation:** all of the above, implemented as specified, plus:
+
+| Column | Why |
+|---|---|
+| `created_at` | Every other model in the schema has it; used as the list tiebreaker. |
+| `updated_at` | Every other model has it. |
+| `deleted_at` | §4.3 forbids hard-deleting a user's articles, and §5.6 defines a DELETE route. Soft deletion is the only way to honour both. |
+
+`author_id` is also now a real foreign key to `users.id`. The previous stand-in table stored it as a
+bare string with no constraint.
+
+**`deleted_at` is deliberately separate from `status = ARCHIVED`.** Archiving is an editorial act — the
+author took a published piece down and may put it back — whereas deleting is removal. Collapsing the
+two would make "unpublish" and "delete" the same operation and leave no way to undo either
+distinctly.
+
+**`published_at` is stamped once**, at the first transition to `PUBLISHED`, and never moved again.
+Re-publishing an archived article keeps the original date, so an edit years later cannot jump the
+piece back to the top of the public list, which is ordered by that column.
+
+---
+
+## §5.6 Articles — implemented as specified, with two clarifications
+
+The five routes match the document exactly, including being keyed by `slug` rather than id. Two
+behaviours the document does not state:
+
+- **An unpublished article returns `404`, not `403`,** to anyone who is not its author or an admin.
+  The slug is derived from the title, so a `403` would confirm that a draft with a guessable title
+  exists at that address. The list route excludes drafts and archived pieces entirely, as §5.6's
+  "List published articles" requires.
+- **`slug` is derived, never supplied.** `ArticleCreateRequest` has no `slug` field. A repeated title
+  gets `-2`, `-3` … appended. Renaming an article moves its slug, so any external link to the old
+  slug breaks — worth knowing before the frontend starts publishing article URLs. The check is a
+  check-then-insert, so two simultaneous creates with the same title can still collide on the unique
+  index; the loser gets a `409` to retry rather than a mangled slug.
+
+Two additive query parameters on the list route, neither in the document: `tag` and `author_id`.
+Note that `tag` is applied **after** pagination, because JSON containment is not portable between
+SQLite and Postgres — so it narrows the current page rather than the whole result set. If tag
+browsing becomes a primary route, it needs a real index and a proper query.
+
+---
+
+## §5.7 Admin — `total_articles` excludes deleted articles
+
+Same change and the same reason as `total_events`: articles are now soft-deleted, so the bare row
+count would include articles no route will serve.
+
+---
+
+## Migration `a1b4e7c90d62`
+
+Brings the four-column stand-in table up to the full shape. Existing rows are backfilled with a slug
+derived from their title, numbered on collision.
+
+The backfill duplicates the logic of `app/core/slug.py` rather than importing it: a migration must
+keep producing the same output forever, and importing application code would let a later refactor
+silently change what a historical migration does. The duplication was verified against
+`slugify()` — including the NFKD transliteration, without which "Ampères & Ohms" backfills as
+`ampères-ohms` while the running app generates `amperes-ohms`.
+
+**Verified on SQLite only**: upgrade, backfill with duplicate and non-ASCII titles, downgrade and
+re-upgrade all succeed. The Docker daemon was unavailable, so the Postgres branch — the
+`DO $$ … pg_type` block that creates the `articlestatus` enum — has **not** been executed. Run
+`alembic upgrade head` against Postgres before merging.
+
+---
+
+## §4.2 HardwareLoan / §5.4 Hardware — borrowers can withdraw a request
+
+**Document:** `status` is `enum: PENDING / APPROVED / RETURNED / REJECTED`. §5.4 lists no route for a
+borrower to withdraw their own request.
+
+**Implementation:** a fifth status, `CANCELLED`, and one new route:
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/hardware/loans/{loan_id}/cancel` | authenticated (borrower only) | Withdraw your own pending request |
+
+Add the status to §4.2's HardwareLoan row and the route to §5.4. The route must stay declared **above**
+`/{hardware_id}`, inside the existing loans block, or `loans` matches as a hardware id — the file
+already carries a comment saying so.
+
+**Why a new value rather than reusing `REJECTED`.** `REJECTED` is an admin's decision; `CANCELLED` is
+the student's own. Collapsing them would make `GET /admin/loans` misreport a withdrawal as a refusal,
+which is precisely the distinction the loan history exists to record. No approver is written on a
+cancellation, because nobody approved or refused anything.
+
+**What it unblocks.** `ACTIVE_LOAN_STATES` in `app/services/loans.py` is `(PENDING, APPROVED)` and is
+what stops duplicate requests for the same item. Until this route existed, a student's own pending
+request blocked them from re-requesting until an admin acted. `CANCELLED` is outside that tuple, so
+cancelling releases the block — covered by
+`test_cancelling_releases_the_duplicate_request_block`.
+
+**Availability is untouched.** A pending loan never held a unit, because units move on approval
+(`request_loan`). Cancelling therefore must not increment `available_quantity`, for exactly the reason
+`reject_loan` does not.
+
+**Ownership is checked before state.** A student probing someone else's loan id gets `403` whatever
+the loan's status, so the response cannot be used to tell a pending request from an approved one. An
+admin also gets `403`: admins reject, they do not withdraw a request on a student's behalf.
+
+- `403` for anyone but the borrower, `401` with no token.
+- `400` ("Loan is not pending") for an approved, returned, rejected or already-cancelled loan — an
+  approved loan is returned, not cancelled.
+- `404` for an unknown loan id.
+
+### Migration `c3d8f1a60b47`
+
+The two dialects need different work. Postgres gets
+`ALTER TYPE loanstatus ADD VALUE IF NOT EXISTS 'CANCELLED'`, which is transactional from PG 12 and so
+safe on the PG 15+ that §3 mandates. SQLite has no enum type: SQLAlchemy renders `Enum` as a plain
+`VARCHAR`, so the column is rebuilt through `batch_alter_table`, widening it from `VARCHAR(8)` to
+`VARCHAR(9)`.
+
+Worth knowing while reading this: SQLAlchemy's `Enum` does **not** emit a `CHECK` constraint by
+default, so on SQLite the column accepts any string at all. That is true of every enum in this schema
+already, not something this change introduced — but it means the test suite cannot catch an invalid
+status value, and only Postgres actually enforces the set.
+
+**The downgrade refuses rather than guessing.** Postgres cannot drop an enum label in place, so the
+type is recreated; but either dialect leaves rows whose `CANCELLED` status has no home in the old set.
+Mapping them to `REJECTED` would rewrite a student's withdrawal as an admin's refusal, so the
+downgrade raises and names the count instead, leaving the decision to the operator.
+
+**Verified on SQLite only**: upgrade, inserting a `CANCELLED` row, the downgrade guard refusing while
+such a row exists, the downgrade succeeding once it is removed, and re-upgrade. The Postgres branch —
+both the `ALTER TYPE` and the type recreation in the downgrade — has **not** been executed.

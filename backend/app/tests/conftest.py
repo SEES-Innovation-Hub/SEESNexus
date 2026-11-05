@@ -72,6 +72,38 @@ async def other_student_user(db_session: AsyncSession) -> User:
 
 
 @pytest_asyncio.fixture
+async def contributor_user(db_session: AsyncSession) -> User:
+    user = User(
+        full_name="Tunde Contributor",
+        email="tunde@unilag.edu.ng",
+        password=hash_password("StrongPass3"),
+        department="EEE",
+        level="400 Level",
+        role=UserRole.CONTRIBUTOR,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def other_contributor_user(db_session: AsyncSession) -> User:
+    user = User(
+        full_name="Chidi Contributor",
+        email="chidi@unilag.edu.ng",
+        password=hash_password("StrongPass4"),
+        department="EEE",
+        level="500 Level",
+        role=UserRole.CONTRIBUTOR,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def admin_user(db_session: AsyncSession) -> User:
     user = User(
         full_name="Admin User",
@@ -100,6 +132,23 @@ async def other_student_token(client: AsyncClient, other_student_user: User) -> 
     resp = await client.post(
         "/api/v1/auth/login",
         json={"email": other_student_user.email, "password": "StrongPass2"},
+    )
+    return resp.json()["data"]["access_token"]
+
+
+@pytest_asyncio.fixture
+async def contributor_token(client: AsyncClient, contributor_user: User) -> str:
+    resp = await client.post(
+        "/api/v1/auth/login", json={"email": contributor_user.email, "password": "StrongPass3"}
+    )
+    return resp.json()["data"]["access_token"]
+
+
+@pytest_asyncio.fixture
+async def other_contributor_token(client: AsyncClient, other_contributor_user: User) -> str:
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"email": other_contributor_user.email, "password": "StrongPass4"},
     )
     return resp.json()["data"]["access_token"]
 
