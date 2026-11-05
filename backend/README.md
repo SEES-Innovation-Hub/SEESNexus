@@ -79,12 +79,21 @@ always catch everything (e.g. some enum or index changes).
   retained.
 - Standard `{status, message, data}` response envelope, including for errors
 - JWT access/refresh tokens with type checking
-- `Hardware`/`HardwareLoan` models (needed for the admin loans endpoints);
-  `Article` remains a minimal stand-in table so the dashboard counts real rows
-  instead of hardcoded numbers.
+- **Articles vertical**: `/api/v1/articles` — public paginated list of published
+  articles (filterable by `tag` and `author_id`) and public detail, both keyed by
+  `slug` rather than id. Creation is limited to contributors and admins; update
+  and delete require the author or an admin. Drafts and archived pieces are
+  visible only to their author or an admin. Articles use soft deletion, and
+  `published_at` is stamped once at first publication so later edits do not
+  reorder the list.
+- `Hardware`/`HardwareLoan` models (needed for the admin loans endpoints).
 
 ## Not implemented here (other verticals / later milestones)
 
-Hardware CRUD (beyond loans), Articles, and the `/upload`
+Hardware CRUD (beyond loans) and the `/upload`
 Cloudinary integration are out of scope for this slice — see the task
 assignment sheets for who owns each.
+
+Articles used to be listed here. It is now implemented as a full vertical
+(see above), so the `Article` stand-in in `app/models/stubs.py` is gone and
+`app/models/article.py` holds the real §4.2 model.
