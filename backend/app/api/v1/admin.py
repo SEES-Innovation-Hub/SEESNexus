@@ -38,7 +38,8 @@ async def dashboard(db: AsyncSession = Depends(get_db)):
         # Events are soft-deleted, so the bare row count includes events an
         # admin has already deleted and which no longer appear on any route.
         total_events=await _count(db, Event, Event.deleted_at.is_(None)),
-        total_articles=await _count(db, Article),
+        # Soft-deleted like events, so the bare row count overstates the total.
+        total_articles=await _count(db, Article, Article.deleted_at.is_(None)),
         total_hardware_items=await _count(db, Hardware),
         pending_loans=await _count(db, HardwareLoan, HardwareLoan.status == LoanStatus.PENDING),
         approved_loans=await _count(db, HardwareLoan, HardwareLoan.status == LoanStatus.APPROVED),
