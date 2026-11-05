@@ -42,6 +42,10 @@ class LoanStatus(str, enum.Enum):
     APPROVED = "APPROVED"
     RETURNED = "RETURNED"
     REJECTED = "REJECTED"
+    # A borrower withdrawing their own pending request. Kept distinct from
+    # REJECTED so the loan history says who ended the request: REJECTED is an
+    # admin's decision, CANCELLED is the student's own.
+    CANCELLED = "CANCELLED"
 
 
 class HardwareLoan(Base):

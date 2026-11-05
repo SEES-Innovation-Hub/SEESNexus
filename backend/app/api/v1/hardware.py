@@ -134,6 +134,31 @@ async def list_my_loans(
     return success(data=data)
 
 
+@router.post("/loans/{loan_id}/cancel")
+async def cancel_loan_request(
+    loan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Withdraw your own pending request.
+
+    Admins reject (PUT /admin/loans/{id}/reject); borrowers cancel. Until this
+    existed, a student's own request blocked them from re-requesting the item
+    until an admin acted on it, because ACTIVE_LOAN_STATES includes PENDING.
+    """
+    result = await db.execute(select(HardwareLoan).where(HardwareLoan.id == loan_id))
+    loan = result.scalar_one_or_none()
+    if loan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
+
+    # Ownership and state checks live in the service, per §4.3.
+    loan = await loans.cancel_loan(db, loan, current_user)
+    return success(
+        data=LoanPublic.model_validate(loan).model_dump(mode="json"),
+        message="Loan request cancelled",
+    )
+
+
 @router.get("/{hardware_id}")
 async def get_hardware(
     hardware_id: str,
