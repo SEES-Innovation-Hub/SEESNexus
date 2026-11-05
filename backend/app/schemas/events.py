@@ -65,6 +65,15 @@ class EventResponse(BaseModel):
     created_by_id: str
     created_at: datetime
 
+    # Filled by _event_response() in api/v1/events.py, which is the only place
+    # allowed to build this model: the counts come from the registrations, not
+    # from a column, and virtual_link is withheld from callers who are not
+    # entitled to it. They default rather than being required so that
+    # model_validate() can still read an Event ORM instance directly.
+    confirmed_count: int = 0
+    # None means unlimited, matching max_participants (Tech Doc §4.2).
+    spots_left: int | None = None
+
 
 class EventRegistrationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
