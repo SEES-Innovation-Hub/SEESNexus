@@ -116,3 +116,79 @@ query issued after the assignment triggers a SQLAlchemy autoflush that writes th
 rejected update could still reach the database. The pre-existing date validation
 (`_validate_event_dates`) had the same shape and now rolls back explicitly before raising;
 `test_rejected_date_update_does_not_persist` covers it and was confirmed to fail without the rollback.
+
+---
+
+## §5.5 Events — three new routes
+
+The document's §5.5 table lists seven routes. Three more are implemented, all additive:
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/events/registrations/my` | authenticated | The caller's own registrations |
+| DELETE | `/events/{id}/register` | authenticated | Cancel a registration |
+| POST | `/events/{id}/restore` | admin | Undo a soft delete |
+
+These rows should be added to §5.5. Note that `/events/registrations/my` must stay declared above
+`GET /{event_id}` in the router, or FastAPI matches `registrations` as an event id.
+
+### `GET /events/registrations/my`
+
+Returns every registration held by the caller, **whatever its status and regardless of the
+registration deadline or the event date**. A student needs to see what they signed up for most of all
+once sign-ups have closed, which is precisely when the rest of the API stops being helpful about it.
+Cancelled rows are included so a screen can show that a place was given up, rather than the row
+vanishing. Registrations belonging to a soft-deleted event are excluded.
+
+Each row carries the registration fields plus `event_title`, `start_date`, `end_date`, `location`,
+`is_virtual` and `virtual_link`, so the screen needs no second request per event. `virtual_link`
+follows the same rule as `EventResponse`: filled only for a `CONFIRMED` registration.
+
+### `DELETE /events/{id}/register`
+
+Sets the caller's registration to `CANCELLED` and, **if it had been `CONFIRMED`**, promotes the
+longest-waiting `WAITLISTED` registration to `CONFIRMED` in the same transaction. A waitlisted student
+cancelling promotes nobody, since they occupied no place.
+
+Response `data` is `{"registration": {...}, "promoted_student_id": "<uuid>" | null}`, so a client can
+tell whether someone moved up without re-reading the participant list.
+
+- `404` when the caller has no registration for that event.
+- `409` when it is already cancelled.
+
+The event row is locked `FOR UPDATE` for the duration, so two simultaneous cancellations cannot
+promote the same waitlisted student twice.
+
+### `POST /events/{id}/restore`
+
+Clears `deleted_at`. `400` if the event is not deleted. Registrations already survive a soft delete,
+so a restored event returns with its sign-ups intact. This is the first caller of the
+`include_deleted` flag that `_get_event_or_404` has always accepted.
+
+---
+
+## §4.2 EventRegistration — `CANCELLED` is now reachable
+
+**Document:** `status` is `enum: CONFIRMED / WAITLISTED / CANCELLED`.
+
+**Implementation:** no schema change — the value was already defined but no route had ever written it.
+Two behaviours follow from it now being reachable:
+
+- **A cancelled registration is revived, not duplicated.** `uq_event_registration_student` permits one
+  row per student per event, so `POST /{id}/register` by a student whose row is `CANCELLED` flips that
+  row back to `CONFIRMED` (or `WAITLISTED` if the event is full) instead of returning 409. Without
+  this, cancelling once would lock a student out of the event permanently.
+- **`registered_at` is reset on revival**, so anyone who joined the waitlist while the student was
+  away keeps their place ahead of the returning student.
+
+---
+
+## §5.5 Events — new `include_deleted` query parameter
+
+`GET /events?include_deleted=true` also returns soft-deleted events. Restricted to admins: `401`
+without credentials, `403` for any non-admin role, matching `get_current_user` and `require_roles`
+elsewhere. The flag is refused rather than ignored, so a caller is never handed a filtered list they
+would mistake for the full one.
+
+Without this, `POST /{id}/restore` would only be usable by an admin who already knew the id of the
+event they had deleted.
