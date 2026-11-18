@@ -1,18 +1,15 @@
 # SEES Nexus — Backend
 
-FastAPI backend for the SEES Nexus v2 rebuild. This package covers the pieces
-owned by the backend lead: repo/CI scaffold, local dev environment, the Auth
-vertical, and the Admin vertical. Full architecture, schema, and API contract
-live in the Technical Documentation v2 — this README only covers running this
-codebase.
-
-This backend lives at `backend/` in the repo root; a `frontend/` belongs beside
-it. Run every command below from `backend/`.
+FastAPI backend for SEES Nexus: auth, projects, hardware lending, events and
+articles. The architecture and API contract live in the Technical Documentation
+v2; every place this code differs from it is recorded in
+[docs/API-DELTA.md](docs/API-DELTA.md). Run every command below from `backend/`.
 
 ## Quick start (Docker — recommended)
 
 ```bash
 cp .env.example .env
+# set SECRET_KEY in .env: the app refuses to start against Postgres with the placeholder
 docker compose up --build
 ```
 
@@ -29,7 +26,8 @@ Seeded accounts (dev only — rotate before any shared/staging use):
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Uncomment the SQLite DATABASE_URL line in .env — no Postgres needed this way.
+# In .env, swap the Postgres DATABASE_URL for the SQLite line — no Postgres
+# needed, and SQLite tables are created automatically on start.
 python seed.py            # optional
 uvicorn app.main:app --reload
 ```
@@ -67,22 +65,38 @@ always catch everything (e.g. some enum or index changes).
   works offline. That field is suppressed whenever a key is present, since
   handing the code to the caller would defeat the verification it gates.
 - **Admin vertical**: `/api/v1/admin/{dashboard,users,users/{id}/role,users/{id}
-  (deactivate),loans,loans/{id}/approve,loans/{id}/reject}`
+  (deactivate),users/{id}/activate,loans,loans/{id}/approve,loans/{id}/reject,
+  loans/{id}/return}`
 - **Projects vertical**: `/api/v1/projects` — members-only paginated list (filterable
   by `category` and `status`) and detail; create is open to any
   authenticated user, while update and delete require the creator or an admin.
   `member_ids` replaces the member set wholesale; `thumbnail_url` stores a
   Cloudinary URL supplied by the client, since this backend never uploads.
-- **Events vertical**: `/api/v1/events` — members-only event listing/detail,
-  admin event management, registration with waitlisting, cancellation with
-  automatic waitlist promotion, `GET /events/registrations/my`, and admin
-  participant views. Events are soft-deleted and can be restored by an admin.
+- **Events vertical**: `/api/v1/events` — members-only event listing/detail
+  (hackathons, workshops, seminars, conferences, orientations), admin event
+  management, registration with waitlisting, cancellation with automatic
+  waitlist promotion (the promoted student is emailed), `GET
+  /events/registrations/my`, admin participant lists with attendance check-in.
+  Events are soft-deleted and can be restored by an admin.
 - **Articles vertical**: `/api/v1/articles` — list, read by id or slug, create
   (contributors and admins), edit and soft-delete (author or admin), with
   DRAFT/PUBLISHED status.
 - Standard `{status, message, data}` response envelope, including for errors
 - JWT access/refresh tokens with type checking
-- `Hardware`/`HardwareLoan` models, including students withdrawing a pending
-  loan request (`PUT /hardware/loans/{id}/cancel`).
+- **Hardware vertical**: `/api/v1/hardware` — inventory (admins add, edit and
+  retire items), loan requests, `GET /hardware/loans/my`, and students
+  withdrawing a pending request (`PUT /hardware/loans/{id}/cancel`). All
+  stock arithmetic lives in `app/services/loans.py`.
+
+## Configuration notes
+
+- `DATABASE_URL` accepts `postgres://` / `postgresql://` URLs as hosts like
+  Render give them, and switches them to the async driver.
+- `SECRET_KEY` must be set to a private value whenever the database is not
+  SQLite; the app refuses to start otherwise, since every JWT is signed with it.
+- Tables are only auto-created for SQLite. Postgres is managed by Alembic:
+  run `alembic upgrade head` on every deploy.
+- Email (OTP codes, waitlist promotions) goes through Brevo when
+  `BREVO_API_KEY` is set; `BREVO_SENDER_EMAIL` must be a sender verified in Brevo.
 
 See `docs/API-DELTA.md` for every contract change against the technical document.

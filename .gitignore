@@ -9,5 +9,8 @@ venv/
 *.egg-info/
 backend/docker-compose.override.yml
 *.log
-config.bat
-node_modules
+node_modules/
+dist/
+# Local env overrides (the committed templates are *.env.example).
+.env.*
+!.env.example

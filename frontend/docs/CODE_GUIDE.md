@@ -42,15 +42,21 @@ src/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
     projects.ts                listProjects, getProject, createProject, updateProject, deleteProject
-    hardware.ts                listHardware, getHardware; requestLoan, listMyLoans (no self-return, §3.13);
+    hardware.ts                listHardware, getHardware; requestLoan, listMyLoans, cancelLoanRequest;
                                createHardware, updateHardware, retireHardware (admin)
-    admin.ts                   getAdminStats, listUsers, changeUserRole, deactivateUser, listAllLoans, approveLoan, rejectLoan
+    admin.ts                   getAdminStats, listUsers, changeUserRole, deactivateUser, listAllLoans,
+                               approveLoan, rejectLoan, returnLoan
+    events.ts                  listEvents, getEvent, register/cancelRegistration, listMyRegistrations;
+                               create/update/delete/restoreEvent, listParticipants, setAttendance (admin)
+    articles.ts                listArticles, getArticle, createArticle, updateArticle, deleteArticle
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
     tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
     upload.ts                  uploadImage (assumed /upload/image contract)
     imageGeneration.ts         generateImage (calls the image service directly)
-  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, admin, envelope)
+  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, admin,
+                               events, article, envelope)
+  vite-env.d.ts                types for import.meta.env (VITE_API_URL)
   context/
     AuthContext.ts             the context + its value type
     AuthProvider.tsx           session state and actions (login, logout, updateProfile)
@@ -64,11 +70,13 @@ src/
     useUrlFilters.ts           filters + page in the address bar, shared by list pages (§3.13)
     useHardwareList.ts         a page of hardware with filters
     useMyLoans.ts              the signed-in person's loans (off for visitors)
-    useHardwareNames.ts        names of the items loans point to (temporary, §3.13)
-    useRequestLoan.ts          the loan request action
+    useRequestLoan.ts / useCancelLoanRequest.ts   a member's loan actions
+    useEvents.ts               event reads: useEventList, useEvent, useMyRegistrations, useParticipants
+    useEventActions.ts         event changes; each refreshes everything under ["events"] (§3.15)
+    useArticles.ts             article reads and changes (§3.16)
     useAdminStats.ts / useAdminLoans.ts / useAdminUsers.ts   admin reads
-    useAdminLoanList.ts        all loans joined with borrower (user list) and item names
-    useApproveLoan.ts / useRejectLoan.ts   admin decisions
+    useAdminLoanList.ts        all loans joined with the borrower (user list)
+    useApproveLoan.ts / useRejectLoan.ts / useReturnLoan.ts   admin decisions and check-in
     useChangeUserRole.ts / useDeactivateUser.ts   member management
     useCreateHardware.ts / useUpdateHardware.ts / useRetireHardware.ts   inventory management
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
@@ -77,7 +85,8 @@ src/
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/  StatTile/   (see §3.10)
+    Avatar/  ProtectedRoute/  GuestRoute/  RoleRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/  StatTile/
+    Checkbox/  Markdown/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection,
                PillarsSection, TeamSection, JoinSection, LandingFooter
@@ -87,13 +96,18 @@ src/
                ProjectNotFound, projectFormValues (values, limits, validation)
     hardware/  HardwareList, HardwareCard, LoanRequestModal, cardActionId
     loans/     MyLoans, LoanCard
-    dashboard/ Dashboard, DashboardLoans, LatestProjects
+    dashboard/ Dashboard, UpcomingEvents, DashboardLoans, LatestProjects
+    events/    EventsList, EventCard, EventDetail, RegistrationPanel, MyEvents, NewEvent, EditEvent,
+               EventForm, eventFormValues, EventParticipants, EventNotFound
+    articles/  ArticlesList, ArticleCard, ArticleDetail, NewArticle, EditArticle, ArticleForm,
+               articleFormValues, ArticleNotFound
     admin/     AdminOverview, AdminLoans, AdminLoanCard, AdminUsers, UserRow,
                AdminHardware, AdminHardwareRow, HardwareFormModal, hardwareFormValues
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
   utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
-               isHttpUrl, canEditProject, returnPath, isOverdue, loanDates, waitingQueue, userLabels
+               isHttpUrl, canEditProject, returnPath, isOverdue, loanDates, waitingQueue, userLabels,
+               eventLabels (labels, dates, places), articleLabels (who may write/edit, dates, reading time)
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -123,7 +137,7 @@ Errors: `errorMessage(error, "fallback text")` returns the backend's own message
 - **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
 - **A dead refresh token:** the client clears the tokens and calls the handler `AuthProvider` registered, which empties the user; `ProtectedRoute` then redirects to `/login`. Public pages are untouched.
 - **Blocked storage:** `tokenStore` keeps the tokens in `localStorage`; if the browser throws on every storage call it falls back to memory, so the app still renders and login works until the tab closes.
-- *Known caveat:* the refresh call uses its own hard-coded `/api/v1/...` path; update it when `VITE_API_URL` is added.
+- **Where the API is:** `client.ts` builds every URL, the refresh call included, from `VITE_API_URL` (empty in development, where Vite proxies `/api`). Production builds on Vercel set it to the Render backend; see `.env.example`.
 
 ### 3.3 Pages load on demand
 `routes/pageLoaders.ts` is the single place that says how each lazy page is loaded:
@@ -207,7 +221,10 @@ All in `src/components/`, one folder each, default export. See every one of them
 | `ConfirmDialog` | "Are you sure?" before delete/reject | `isPending` spins the button and blocks closing. |
 | `TextField`, `TextArea`, `Select` | Form fields | Built on `Field` (label + hint + error). `error` turns the border red and is read out by screen readers. Optional fields are labelled "(optional)" automatically. |
 | `Avatar` | A person's photo or initial | `name`, `imageUrl`, `size` (px). Decorative: put the name next to it. |
-| `AdminRoute` | Wrapping admin-only pages | Not signed in → `/login`; not an admin → their own start page. The backend enforces the real rule. |
+| `Checkbox` | A yes/no option | Native checkbox with the label beside it (44px tap target), optional `hint`. |
+| `Markdown` | Showing an article body | Builds React elements, never `innerHTML`; links only for http(s). See §3.16. |
+| `RoleRoute` | Pages only some roles may open | `roles={["CONTRIBUTOR", "ADMIN"]}`. Not signed in → `/login`; wrong role → their own start page. The backend enforces the real rule. |
+| `AdminRoute` | Wrapping admin-only pages | `RoleRoute` with `["ADMIN"]`. |
 | `ProjectCard` | A project in a list | The whole card links to the project; the parent sets its width (rail: fixed, Projects page: grid column). |
 | `StatTile` | One headline number | `label`, `value` (compact: 12.9K), optional `detail` and `to` (whole tile links). Numbers always come from the API. |
 | `useToast().showToast(msg, tone?)` | Short feedback after an action | `"success"` (default) or `"error"`; fades after 5 s, max 3 at once. |
@@ -257,34 +274,62 @@ AppLayout
 | Route | Who | Page |
 |---|---|---|
 | `/hardware` | signed in | `HardwareList`: category/availability filters, 12 per page; "Request loan" opens `LoanRequestModal` |
-| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected). No return button: see below |
+| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected, withdrawn). A pending request can be withdrawn. |
 
 - **Shared list filters:** `useUrlFilters()` gives `page`, `read(name, guard)` (a value only counts if the guard recognises it), `setFilter` (returns to page 1), `setPage` (scrolls to the top) and `clearAll`. Projects and Hardware both use it.
 - **The card's action matches what the backend would allow:** your pending/approved loan → a link to My Loans. Under maintenance or none left → the reason. Otherwise "Request loan". The backend refuses duplicates, maintenance items and empty shelves, so nobody fills in a request that's bound to fail.
 - **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once.
-- **Students can't mark a loan returned.** The backend's `PUT /hardware/loans/:id/return` lets the *borrower* close a loan, so anyone could "return" something still in their bag and free up a unit that isn't on the shelf. The website doesn't use it. An approved loan shows "Bring it back to the lab. An admin will check it in." Returns will be confirmed by an admin, once the backend has an admin return endpoint (DECISIONS open item 20).
+- **Students can't mark a loan returned;** only an admin can (`PUT /admin/loans/:id/return`, "Mark returned" on `AdminLoanCard`), once the item is physically back. An approved loan shows the member "Bring it back to the lab. An admin will check it in."
+- **Withdrawing:** a member can withdraw a request while it is still PENDING (`PUT /hardware/loans/:id/cancel`, status CANCELLED, shown as "Withdrawn"). It never held a unit, so the shelf doesn't change.
 - **Focus after a request:** the card's button is replaced by a link, so the dialog can't return focus to it. `HardwareList` focuses the new link (`cardActionId`) two frames after closing. Cancelling still returns focus to the button the normal way.
 - **Return date:** optional, can't be before tomorrow, sent as the end of that day in the borrower's time zone.
-- **Loan names are a stopgap:** loans only carry `hardware_id`, so `useHardwareNames` fetches each distinct item once (cached for an hour). Remove it when the backend includes the name (DECISIONS open item 16).
+- **Item names** come with each loan (`hardware_name`), so no extra requests are made to show them.
 - **Overdue:** an approved loan past its due date gets a red "Overdue" badge.
-- **Not here:** adding, editing or retiring hardware and approving or rejecting loans are admin pages (Phase 3). There's no "cancel my request" endpoint.
+- **Not here:** adding, editing or retiring hardware and approving, rejecting or checking in loans are admin pages (§3.14).
 
 ### 3.14 Dashboard and admin
 | Route | Who | Page |
 |---|---|---|
-| `/dashboard` | members (their home) | Greeting, quick actions, `DashboardLoans` (current loans, overdue first), `LatestProjects` (3 newest). Each section loads on its own. |
-| `/admin` | admins (their home) | `AdminOverview`: four `StatTile`s from `GET /admin/dashboard`, then the 3 oldest waiting requests |
+| `/dashboard` | members (their home) | Greeting, quick actions, `UpcomingEvents` (next 3), `DashboardLoans` (current loans, overdue first), `LatestProjects` (3 newest). Each section loads on its own. |
+| `/admin` | admins (their home) | `AdminOverview`: six `StatTile`s from `GET /admin/dashboard`, then the 3 oldest waiting requests |
 | `/admin/loans` | admins | `AdminLoans`: Waiting / On loan / History / All (`?view=` in the URL), each loan as `AdminLoanCard` |
 | `/admin/users` | admins | `AdminUsers`: search (name, email, department) and role filter, each member as `UserRow` |
 | `/admin/hardware` | admins | `AdminHardware`: inventory with filters and paging; Add/Edit in `HardwareFormModal`; Retire / Back in service per `AdminHardwareRow` |
 
 - **Admin pages** sit in one nested route wrapped in `AdminRoute` (`<AdminRoute><Outlet/></AdminRoute>`). Students who open them are sent to their Dashboard. Each admin page is its own chunk, so students never download it.
-- **Who and what:** a loan carries only ids, so `useAdminLoanList` joins it with `/admin/users` (borrower name, email, department, level) and `useHardwareNames` (item name).
+- **Who and what:** a loan carries the item's name but only the borrower's id, so `useAdminLoanList` joins it with `/admin/users` (borrower name, email, department, level).
 - **Order:** waiting requests oldest first (`waitingQueue`, first come, first served), loans out now overdue first, history newest first.
 - **Decisions:** Approve needs no confirmation; Reject asks first. A failed approval (e.g. "No units available to lend" when the last unit already went out) is shown as an error toast and the request stays in the queue. After any decision the loans, the stats and (for approvals) hardware availability refresh.
 - **Members:** the backend sends every account (no paging/search), so search and the role filter run in the browser, in local state (typing into the URL would add a history entry per keystroke). Changing a role picks it in the dropdown, then asks for confirmation (with a warning when making someone an admin). Deactivating warns it can't be undone from the website yet. **The admin's own row has no controls**, because the backend doesn't stop admins demoting or deactivating themselves. Deactivated members show a badge and lose their controls.
 - **Inventory:** the form validates against the backend limits. Quantity can't go below the units out on loan (the form says how many). Backend errors such as a duplicate serial number appear inside the form. **Retire** is the backend's soft delete (status MAINTENANCE, history kept), so it can be undone: **Back in service** sets the status the stock implies (AVAILABLE, or BORROWED if every unit is out). There's no status field in the form; those two buttons are the only way to change it.
 - **Sidebar:** "Admin" group (Overview, Loan requests, Members, Inventory) for admins only. Overview uses `exact` so it isn't highlighted on `/admin/loans`.
+
+### 3.15 Events
+| Route | Who | Page |
+|---|---|---|
+| `/events` | signed in | `EventsList`: Upcoming / All / Deleted (admins) (`?view=`), type filter (`?type=`), 12 per page. Each `EventCard` shows places left and the member's own status. |
+| `/events/:id` | signed in | `EventDetail`: when, where, places, description, and `RegistrationPanel`. Admins also get Edit, Delete / Restore and Participants. |
+| `/my-events` | signed in | `MyEvents`: "Coming up" and "Past and cancelled", from `GET /events/registrations/my` (not limited by deadlines). |
+| `/events/new`, `/events/:id/edit` | admins | `EventForm` (times in the admin's own timezone, sent as ISO). The place limit can't go below people already confirmed. |
+| `/events/:id/participants` | admins | `EventParticipants`: counts, then Confirmed (with an "Attended" check-in box), Waitlist in order, Cancelled. |
+
+- **Registering** confirms while places last, then waitlists; the toast says which. A waitlisted member sees their position and is emailed by the backend when a place opens.
+- **Cancelling** is allowed until the event starts (also after the deadline). The freed place goes to the first person waiting. Registering again puts you at the back of the line.
+- **The meeting link** is only in the API response for admins and confirmed members, so the page just shows it when present.
+- **Refreshing:** nearly every change moves a count shown on several screens, so `useEventActions` refreshes everything under `["events"]` (and the admin stats for create/delete/restore).
+- **Deleted events** stay restorable: admins find them under Events → Deleted, open one and press Restore; registrations come back with it.
+
+### 3.16 News (articles)
+| Route | Who | Page |
+|---|---|---|
+| `/articles` | signed in | `ArticlesList`: title search (`?q=`); contributors and admins also get "My articles & drafts" (`?mine=1`). |
+| `/articles/:slug` | signed in | `ArticleDetail`: the body rendered by `Markdown`. Author and admins get Edit / Delete. |
+| `/articles/new` | contributors, admins | `NewArticle` (wrapped in `RoleRoute`). Draft or published; Write / Preview. |
+| `/articles/:slug/edit` | author, admins | `EditArticle` (checks `canEditArticle` itself, since it depends on the article). The link name (slug) only changes if edited. |
+
+- **Markdown** (`components/Markdown`) builds React elements and never uses `innerHTML`, so an article can't inject markup or scripts; links are only made for http(s). It covers headings, lists, quotes, code blocks, bold, italic, inline code and links.
+- **Drafts** are visible to their author and admins only (the backend returns 404 to anyone else).
+- **Slugs:** generated by the backend from the title. `new` is reserved so it can never shadow `/articles/new`.
 
 ## 4. Every `useEffect` and why it exists
 

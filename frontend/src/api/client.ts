@@ -6,8 +6,15 @@ import axios, {
 import type { Envelope } from "../types/envelope";
 import { tokenStore } from "./tokenStore";
 
+// Where the backend lives. In development this is empty and Vite proxies /api
+// to localhost:8000 (vite.config.ts). A production build that is served from a
+// different host than the API (Vercel + Render) sets VITE_API_URL to the API's
+// origin, e.g. https://seesnexus.onrender.com, when it is built.
+const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
+const API_BASE_URL = `${API_ORIGIN}/api/v1`;
+
 export const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: API_BASE_URL,
 });
 
 api.interceptors.request.use((config) => {
@@ -74,7 +81,7 @@ async function refreshAccessToken(): Promise<string> {
     throw new Error("No refresh token available");
   }
   const { data } = await axios.post<Envelope<{ access_token: string }>>(
-    "/api/v1/auth/refresh",
+    `${API_BASE_URL}/auth/refresh`,
     {
       refresh_token: refreshToken,
     },

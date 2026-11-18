@@ -18,7 +18,6 @@ export const queryKeys = {
   hardware: {
     lists: ["hardware", "list"] as const,
     list: (params: HardwareListParams) => ["hardware", "list", params] as const,
-    detail: (id: string) => ["hardware", "detail", id] as const,
   },
   loans: {
     mine: ["loans", "mine"] as const,

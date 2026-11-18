@@ -6,9 +6,11 @@ on:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
   push:
-    branches: [main]
+    # The default branch is master; "main" meant pushes never ran CI.
+    branches: [master]
     paths:
       - "backend/**"
+      - ".github/workflows/backend-ci.yml"
 
 jobs:
   test:
@@ -16,6 +18,12 @@ jobs:
     defaults:
       run:
         working-directory: backend
+
+    # The app refuses to start against Postgres with the default SECRET_KEY,
+    # and Alembic loads the app's settings, so every step needs one.
+    env:
+      SECRET_KEY: ci-test-secret
+      DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@localhost:5432/sees_nexus_test
 
     services:
       postgres:
@@ -49,19 +57,12 @@ jobs:
         run: pip install ruff && ruff check .
 
       - name: Run migrations
-        env:
-          DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@localhost:5432/sees_nexus_test
         run: alembic upgrade head
 
       - name: Migration round-trip (Postgres)
-        env:
-          DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@localhost:5432/sees_nexus_test
         # The suite runs on in-memory SQLite and cannot catch enum creation
         # ordering; this step does.
         run: alembic upgrade head && alembic downgrade -1 && alembic upgrade head
 
       - name: Run tests
-        env:
-          DATABASE_URL: postgresql+asyncpg://sees_nexus:sees_nexus@localhost:5432/sees_nexus_test
-          SECRET_KEY: ci-test-secret
         run: pytest app/tests -v

@@ -6,9 +6,11 @@ export function useRetireHardware() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: retireHardware,
-    onSuccess: (item) => {
-      queryClient.setQueryData(queryKeys.hardware.detail(item.id), item);
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.hardware.lists });
+      // Loans carry the item's name, so a rename shows up there too.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.loans });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.loans.mine });
     },
   });
 }

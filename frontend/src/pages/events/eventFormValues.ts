@@ -40,7 +40,7 @@ export const EMPTY_VALUES: EventFormValues = {
 };
 
 // ISO timestamp -> the local "YYYY-MM-DDTHH:mm" a datetime-local input shows.
-export function toLocalInput(iso: string): string {
+function toLocalInput(iso: string): string {
   const date = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;

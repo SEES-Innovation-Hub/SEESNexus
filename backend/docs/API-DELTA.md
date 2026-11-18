@@ -198,3 +198,48 @@ author_id, author {id, full_name, profile_image_url}, created_at, updated_at, pu
 `published_at` is set the first time an article is published and kept after that.
 
 The admin dashboard's `total_articles` now excludes deleted articles.
+
+---
+
+## §4.2 Event — `ORIENTATION` event type
+
+`EventType` gains `ORIENTATION`, for semester welcome sessions. Migration `d4a9f2e61c38`
+(downgrading turns orientations into workshops, since Postgres cannot drop an enum value).
+
+---
+
+## §4.2 EventRegistration / §5.5 Events — attendance
+
+**New column:** `attended_at` (timestamp, nullable) on registrations.
+
+**New route:** `PUT /{id}/participants/{registration_id}/attendance` — admin only, body
+`{"attended": true|false}`. Only a `CONFIRMED` registration can be marked (`400` otherwise); a
+registration from another event is `404`. Marking twice keeps the first time; `false` clears it.
+Cancelling, or registering again after cancelling, clears it too.
+
+**Response changes:** `attended_at` on participant rows and on `GET /registrations/my`;
+`attended_count` (confirmed and checked in) on every event response.
+
+---
+
+## §5.5 Events — waitlist promotion email
+
+When a cancellation or a raised `max_participants` moves a student off the waitlist, they are emailed
+through Brevo ("You have a place: <event>"). The email is sent after the response, and a failed send is
+logged and never undoes the promotion. Without `BREVO_API_KEY` nothing is sent.
+
+---
+
+## §5.6 Articles — reserved slug
+
+`new` is never used as a slug (a generated one becomes `new-2`; sending `"slug": "new"` is `409`),
+because the frontend serves its "write an article" page at `/articles/new`.
+
+---
+
+## §9.1 Configuration
+
+- `DATABASE_URL` starting `postgres://` or `postgresql://` is rewritten to `postgresql+asyncpg://`.
+- With any non-SQLite database the app refuses to start if `SECRET_KEY` is the built-in default or
+  starts with `change-me` (the `.env.example` placeholder).
+- Tables are created on start-up only for SQLite; Postgres is Alembic-only.

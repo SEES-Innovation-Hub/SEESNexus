@@ -24,11 +24,6 @@ export function listHardware({ page, pageSize, category, status }: HardwareListP
   );
 }
 
-// Signed in.
-export function getHardware(id: string) {
-  return unwrap<Hardware>(api.get(`/hardware/${id}`));
-}
-
 // Admin only. A new item starts with every unit available.
 export function createHardware(payload: HardwarePayload) {
   return unwrap<Hardware>(api.post("/hardware", payload));

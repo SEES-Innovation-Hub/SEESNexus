@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,8 +12,11 @@ from app.core.database import init_models
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Dev/test convenience only — production schema changes go through Alembic (§9.2).
-    await init_models()
+    # A zero-setup SQLite dev database gets its tables made here. Postgres is
+    # managed by Alembic only: create_all there would build tables Alembic then
+    # trips over, and would never add new columns anyway.
+    if settings.is_sqlite:
+        await init_models()
     yield
 
 
@@ -40,7 +43,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=422,
         content={"status": "error", "message": "Validation failed", "data": exc.errors()},
     )
 
