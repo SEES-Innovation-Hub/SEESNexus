@@ -37,4 +37,6 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 - `frontend-ci.yml`: type check, lint, build.
 - `repo-guard.yml`: blocks committed `.env` files, code hidden far to the right
   of a line, and build configuration that downloads or evaluates code — the
-  techniques used in the November 2026 compromise of `master`.
+  techniques used in the November 2026 compromise of the old `master` branch.
+
+The default branch is `main`.
