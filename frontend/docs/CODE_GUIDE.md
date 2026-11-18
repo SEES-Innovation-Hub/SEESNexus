@@ -90,7 +90,7 @@ src/
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection,
                PillarsSection, TeamSection, JoinSection, LandingFooter
-    auth/      Login, Register, OtpVerification
+    auth/      Login, Register, OtpVerification, ForgotPassword
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
     projects/  ProjectsList, ProjectDetail, NewProject, EditProject, ProjectForm, TechStackInput, TeamPicker,
                ProjectNotFound, projectFormValues (values, limits, validation)
@@ -184,6 +184,8 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 - `verify-code` **uses the code up**, and `register` only accepts an already-used code. That is why a failure at the register step sends the user back to the details form to request a fresh code, instead of leaving them on the OTP screen.
 - `Register` owns the state (`details`, `step`, `error`, `isSubmitting`); `OtpVerification` only shows the second screen.
 - **Admin sign-up:** ticking "I'm registering as an admin" shows an "Admin key" field. The key is checked with `POST /auth/admin-key/check` *before* the email code is sent (verifying the code uses it up, so a typo found later would mean a new code), then sent as `admin_key` with the registration. The right key makes an ADMIN account, which lands on `/admin`; a wrong one is refused with the backend's message. The key itself is set on the server (`ADMIN_REGISTRATION_KEY`) and shared privately.
+- **Forgot password:** `/forgot-password` (a `GuestRoute`, linked from Login). Step 1 sends the email (the backend answers the same whether or not an account exists); step 2 takes the code and a new password. Success returns to Login with a notice (`state.notice`). The reset signs the account out everywhere.
+- **Too many attempts:** login, codes and resets are rate-limited by the backend (`429`); `errorMessage` shows its "Try again in N minutes" text as is.
 - **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate: to the page they wanted, or their home (`/admin` for admins, `/dashboard` for everyone else).
 - Both the login submit and the register "code verified" handler call `prefetchPages("profile")` first, so the Profile code downloads while the request runs.
 

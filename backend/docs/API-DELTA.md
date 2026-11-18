@@ -311,3 +311,35 @@ active member.
 - The Cloudinary call runs in a worker thread (it is synchronous and used to block the server).
 - Images go to the `sees-nexus` folder.
 - Provider errors are logged, not returned: `502 "The image couldn't be uploaded. Try again in a moment."`
+
+---
+
+## §5.1 / §5.2 Auth — code attempt limit, rate limits, password reset
+
+**Email codes**
+- A code dies after 5 wrong guesses (`verification_codes.attempts`); the error says to request a new one.
+  Wrong guesses count against the email's current code.
+- Requesting a new code deletes the email's previous unused code for that purpose.
+- Codes have a `purpose`: `REGISTER` or `RESET_PASSWORD`; one can't be used for the other.
+- `/notify/verify-code` error messages now say why: wrong, expired/used, or too many tries.
+
+**Rate limits** (`429` with `Retry-After`, standard error envelope; counted in Postgres)
+
+| Action | Per IP | Per email |
+|---|---|---|
+| `POST /auth/login` | 30 / 15 min | 10 / 15 min (cleared by a successful login) |
+| `POST /notify/send-code`, `POST /auth/forgot-password` | 10 / hour | 3 / 15 min |
+| `POST /notify/verify-code`, `POST /auth/reset-password` | 30 / 15 min | (5 tries per code) |
+| `POST /auth/admin-key/check` | 10 / 15 min | |
+
+Client IP: the `TRUSTED_PROXY_COUNT`-th entry from the right of `X-Forwarded-For` (1 on Render), else
+the connection's address.
+
+**New routes**
+- `POST /auth/forgot-password` `{email}` — always `200` with the same message; emails a reset code (after
+  the response) only if an active account exists.
+- `POST /auth/reset-password` `{email, code, new_password}` — sets the password. `users.password_changed_at`
+  is recorded and every access or refresh token issued before it is refused (`401 "Your password was
+  changed. Please log in again."`), so a reset signs out all existing sessions.
+
+Migration `f1b6d2c84a57` (tested up/down on SQLite and Postgres).

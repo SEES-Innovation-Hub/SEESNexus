@@ -28,6 +28,16 @@ class RegisterRequest(BaseModel):
     admin_key: str | None = Field(default=None, max_length=256)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=1, max_length=10)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class AdminKeyCheckRequest(BaseModel):
     admin_key: str = Field(min_length=1, max_length=256)
 

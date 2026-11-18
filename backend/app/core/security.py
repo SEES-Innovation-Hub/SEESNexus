@@ -62,6 +62,11 @@ class InvalidTokenError(Exception):
 
 def decode_token(token: str, expected_type: TokenType) -> str:
     """Returns the user id (sub claim) or raises InvalidTokenError."""
+    return decode_token_claims(token, expected_type)[0]
+
+
+def decode_token_claims(token: str, expected_type: TokenType) -> tuple[str, int]:
+    """Returns (user id, issued-at as a Unix timestamp) or raises InvalidTokenError."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError as exc:
@@ -73,4 +78,17 @@ def decode_token(token: str, expected_type: TokenType) -> str:
     subject = payload.get("sub")
     if not subject:
         raise InvalidTokenError("Token missing subject")
-    return subject
+    return subject, int(payload.get("iat") or 0)
+
+
+def issued_before_password_change(issued_at: int, password_changed_at: datetime | None) -> bool:
+    """True for a token minted before the user's last password change.
+
+    JWT iat has one-second resolution, so compare whole seconds: a login in the
+    same second as the reset must still work.
+    """
+    if password_changed_at is None:
+        return False
+    if password_changed_at.tzinfo is None:
+        password_changed_at = password_changed_at.replace(tzinfo=timezone.utc)
+    return issued_at < int(password_changed_at.timestamp())

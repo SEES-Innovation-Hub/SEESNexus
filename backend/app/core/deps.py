@@ -4,7 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import InvalidTokenError, TokenType, decode_token
+from app.core.security import (
+    InvalidTokenError,
+    TokenType,
+    decode_token_claims,
+    issued_before_password_change,
+)
 from app.models.user import User, UserRole
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -18,7 +23,7 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
     try:
-        user_id = decode_token(credentials.credentials, TokenType.ACCESS)
+        user_id, issued_at = decode_token_claims(credentials.credentials, TokenType.ACCESS)
     except InvalidTokenError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
@@ -29,6 +34,11 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User no longer exists")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
+    if issued_before_password_change(issued_at, user.password_changed_at):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Your password was changed. Please log in again.",
+        )
 
     return user
 

@@ -7,5 +7,6 @@ from app.models.project import (  # noqa: F401
     ProjectMember,
     ProjectStatus,
 )
+from app.models.rate_limit import RateLimitEvent  # noqa: F401
 from app.models.user import User, UserRole  # noqa: F401
-from app.models.verification_code import VerificationCode  # noqa: F401
+from app.models.verification_code import CodePurpose, VerificationCode  # noqa: F401

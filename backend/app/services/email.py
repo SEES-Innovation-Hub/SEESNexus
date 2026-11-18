@@ -19,6 +19,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 SUBJECT = "Your SEES Nexus verification code"
+RESET_SUBJECT = "Reset your SEES Nexus password"
 PROMOTION_SUBJECT = "You have a place: {title}"
 
 # Cached per API key: the Brevo client owns an httpx connection pool and exposes
@@ -38,15 +39,18 @@ def is_configured() -> bool:
     return bool(settings.BREVO_API_KEY)
 
 
-def _body(code: str) -> tuple[str, str]:
+def _body(code: str, reset: bool = False) -> tuple[str, str]:
     minutes = settings.OTP_EXPIRE_MINUTES
-    text = (
-        f"Your SEES Nexus verification code is {code}.\n\n"
-        f"It expires in {minutes} minutes. If you did not request it, ignore this email.\n"
+    what = "password reset code" if reset else "verification code"
+    ignore = (
+        "If you didn't ask to reset your password, ignore this email; your password stays the same."
+        if reset
+        else "If you did not request it, ignore this email."
     )
+    text = f"Your SEES Nexus {what} is {code}.\n\nIt expires in {minutes} minutes. {ignore}\n"
     html = (
-        f"<p>Your SEES Nexus verification code is <strong>{code}</strong>.</p>"
-        f"<p>It expires in {minutes} minutes. If you did not request it, ignore this email.</p>"
+        f"<p>Your SEES Nexus {what} is <strong>{code}</strong>.</p>"
+        f"<p>It expires in {minutes} minutes. {ignore}</p>"
     )
     return text, html
 
@@ -91,7 +95,7 @@ async def _send(to_email: str, subject: str, text_content: str, html_content: st
         raise EmailSendError("Could not send the email") from exc
 
 
-async def send_otp_email(to_email: str, code: str) -> bool:
+async def send_otp_email(to_email: str, code: str, *, reset: bool = False) -> bool:
     """Email a verification code.
 
     Returns False when Brevo is not configured: that is the local-development
@@ -104,8 +108,8 @@ async def send_otp_email(to_email: str, code: str) -> bool:
         logger.warning("BREVO_API_KEY is unset -- no verification email sent to %s", to_email)
         return False
 
-    text_content, html_content = _body(code)
-    await _send(to_email, SUBJECT, text_content, html_content)
+    text_content, html_content = _body(code, reset=reset)
+    await _send(to_email, RESET_SUBJECT if reset else SUBJECT, text_content, html_content)
     return True
 
 

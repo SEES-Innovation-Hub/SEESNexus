@@ -26,6 +26,17 @@ export function checkAdminKey(adminKey: string) {
   return unwrap<null>(api.post("/auth/admin-key/check", { admin_key: adminKey }));
 }
 
+// Always answers the same, whether or not the address has an account.
+export function forgotPassword(email: string) {
+  return unwrap<{ email: string; debug_code?: string }>(api.post("/auth/forgot-password", { email }));
+}
+
+// 400 with the reason (wrong, expired, or too many tries). Signs out every
+// existing session for the account.
+export function resetPassword(email: string, code: string, newPassword: string) {
+  return unwrap<null>(api.post("/auth/reset-password", { email, code, new_password: newPassword }));
+}
+
 export function login(email: string, password: string) {
   return unwrap<TokenPair>(api.post("/auth/login", { email, password }));
 }

@@ -63,6 +63,8 @@ const UNAUTHENTICATED_PATHS = [
   "/auth/login",
   "/auth/register",
   "/auth/refresh",
+  "/auth/forgot-password",
+  "/auth/reset-password",
   "/notify/",
 ];
 

@@ -100,7 +100,12 @@ always catch everything (e.g. some enum or index changes).
   as an admin" option on the sign-up page) gets an ADMIN account. Keep it
   private, at least 24 characters; empty switches admin sign-up off. To revoke
   it, change it and redeploy; existing admins keep their accounts.
-- Email (OTP codes, waitlist promotions) goes through Brevo when
+- **Rate limits** (login, email codes, password reset, admin-key checks) are
+  counted in Postgres (`rate_limit_events`), so they hold across restarts and
+  instances with no Redis. They're per client IP and per email; set
+  `TRUSTED_PROXY_COUNT=1` on Render or every visitor shares the load
+  balancer's IP. The numbers live at the top of `app/services/rate_limit.py`.
+- Email (OTP codes, password resets, waitlist promotions) goes through Brevo when
   `BREVO_API_KEY` is set; `BREVO_SENDER_EMAIL` must be a sender verified in Brevo.
 
 See `docs/API-DELTA.md` for every contract change against the technical document.

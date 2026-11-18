@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     # only be made by an existing admin changing someone's role.
     ADMIN_REGISTRATION_KEY: str = ""
 
+    # --- Client IP behind a proxy ---
+    # How many proxies sit in front of the app and append to X-Forwarded-For.
+    # Rate limits are per client IP; with 0 the TCP peer is used, which behind
+    # Render's load balancer is the balancer itself, so every user would share
+    # one limit. Set to 1 on Render. Never set it higher than the real number
+    # of proxies: entries further left are written by the client and can be faked.
+    TRUSTED_PROXY_COUNT: int = 0
+
     # --- CORS ---
     CORS_ORIGINS: str = "http://localhost:5173"
 

@@ -6,6 +6,7 @@ export const pageLoaders = {
   appLayout: () => import("../layouts/AppLayout"),
   login: () => import("../pages/auth/Login"),
   register: () => import("../pages/auth/Register"),
+  forgotPassword: () => import("../pages/auth/ForgotPassword"),
   profile: () => import("../pages/profile/Profile"),
   projectsList: () => import("../pages/projects/ProjectsList"),
   projectDetail: () => import("../pages/projects/ProjectDetail"),
@@ -35,6 +36,7 @@ export type PageName = keyof typeof pageLoaders;
 const PAGE_FOR_PATH: Record<string, PageName> = {
   "/login": "login",
   "/register": "register",
+  "/forgot-password": "forgotPassword",
   "/profile": "profile",
   "/projects": "projectsList",
   "/projects/new": "newProject",

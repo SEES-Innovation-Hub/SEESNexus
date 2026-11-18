@@ -14,6 +14,7 @@ import { pageLoaders } from "./routes/pageLoaders";
 // (The loaders live in routes/pageLoaders so links can prefetch the same code.)
 const Login = lazy(() => pageLoaders.login().then((m) => ({ default: m.Login })));
 const Register = lazy(() => pageLoaders.register().then((m) => ({ default: m.Register })));
+const ForgotPassword = lazy(() => pageLoaders.forgotPassword().then((m) => ({ default: m.ForgotPassword })));
 const AppLayout = lazy(() => pageLoaders.appLayout().then((m) => ({ default: m.AppLayout })));
 const Profile = lazy(() => pageLoaders.profile().then((m) => ({ default: m.Profile })));
 const ProjectsList = lazy(() => pageLoaders.projectsList().then((m) => ({ default: m.ProjectsList })));
@@ -74,6 +75,14 @@ function App() {
           element={
             <GuestRoute>
               <Register />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <GuestRoute>
+              <ForgotPassword />
             </GuestRoute>
           }
         />

@@ -10,11 +10,22 @@ import { prefetchPageForPath } from "../../routes/pageLoaders";
 import { redirectPathForRole } from "../../utils/redirectPathForRole";
 import { readReturnPath } from "../../utils/returnPath";
 
+function readNotice(state: unknown): string | null {
+  if (typeof state === "object" && state !== null && "notice" in state) {
+    const notice = (state as { notice: unknown }).notice;
+    return typeof notice === "string" ? notice : null;
+  }
+  return null;
+}
+
 export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   // Set when a members-only page sent them here (ProtectedRoute).
-  const returnPath = readReturnPath(useLocation().state);
+  const location = useLocation();
+  const returnPath = readReturnPath(location.state);
+  // A message handed over by the page that sent them here (e.g. after a reset).
+  const notice = readNotice(location.state);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +68,25 @@ export function Login() {
             value={password}
             onChange={setPassword}
           />
+          <p className="-mt-2 text-right text-sm">
+            <PrefetchLink
+              to="/forgot-password"
+              className="-my-3 inline-block py-3 text-sees-mustard underline hover:text-sees-mint"
+            >
+              Forgot your password?
+            </PrefetchLink>
+          </p>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {notice && !error && (
+            <p role="status" className="text-sm text-sees-mint">
+              {notice}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-red-400">
+              {error}
+            </p>
+          )}
 
           <Button type="submit" isLoading={isSubmitting} className="w-full">
             {isSubmitting ? "Logging in…" : "Log in"}
