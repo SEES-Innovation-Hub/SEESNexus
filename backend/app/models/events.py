@@ -13,6 +13,8 @@ class EventType(str, enum.Enum):
     WORKSHOP = "WORKSHOP"
     SEMINAR = "SEMINAR"
     CONFERENCE = "CONFERENCE"
+    # Welcome sessions for new members at the start of a semester.
+    ORIENTATION = "ORIENTATION"
 
 
 class RegistrationStatus(str, enum.Enum):
@@ -56,5 +58,8 @@ class EventRegistration(Base):
         Enum(RegistrationStatus), nullable=False, default=RegistrationStatus.CONFIRMED
     )
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # When an admin checked the student in at the event. Null = not (yet) marked
+    # as attended. Only a CONFIRMED registration can carry it.
+    attended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     event: Mapped[Event] = relationship(back_populates="registrations")

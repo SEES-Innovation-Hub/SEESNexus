@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.core.security import hash_password
 from app.models.events import Event, EventRegistration, EventType
 from app.models.user import User, UserRole
+from app.services import email
 from app.tests.conftest import auth_header
 
 BASE = "/api/v1/events"
@@ -658,3 +659,150 @@ async def test_admin_can_list_and_restore_deleted_events(
 
     visible = await client.get(f"{BASE}/{event['id']}", headers=auth_header(student_token))
     assert visible.status_code == 200
+
+
+# --- orientations and attendance ---
+
+
+@pytest.mark.asyncio
+async def test_orientation_is_an_event_type(client: AsyncClient, admin_token: str, student_token: str):
+    await create_event(client, admin_token, title="Freshers' orientation", event_type="ORIENTATION")
+    await create_event(client, admin_token, title="Hack night")
+    response = await client.get(f"{BASE}?event_type=ORIENTATION", headers=auth_header(student_token))
+    assert [e["title"] for e in response.json()["data"]["items"]] == ["Freshers' orientation"]
+
+
+@pytest.mark.asyncio
+async def test_admin_marks_and_clears_attendance(
+    client: AsyncClient, admin_token: str, student_token: str
+):
+    event = await create_event(client, admin_token)
+    registration = await register(client, event["id"], student_token)
+    url = f"{BASE}/{event['id']}/participants/{registration['id']}/attendance"
+
+    marked = await client.put(url, json={"attended": True}, headers=auth_header(admin_token))
+    assert marked.status_code == 200
+    first_time = marked.json()["data"]["attended_at"]
+    assert first_time is not None
+
+    # Marking again keeps the original check-in time.
+    again = await client.put(url, json={"attended": True}, headers=auth_header(admin_token))
+    assert again.json()["data"]["attended_at"] == first_time
+
+    participants = await client.get(
+        f"{BASE}/{event['id']}/participants", headers=auth_header(admin_token)
+    )
+    assert participants.json()["data"][0]["attended_at"] == first_time
+    detail = await client.get(f"{BASE}/{event['id']}", headers=auth_header(admin_token))
+    assert detail.json()["data"]["attended_count"] == 1
+    mine = await my_registrations(client, student_token)
+    assert mine[0]["attended_at"] == first_time
+
+    cleared = await client.put(url, json={"attended": False}, headers=auth_header(admin_token))
+    assert cleared.json()["data"]["attended_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_attendance_rules(
+    client: AsyncClient, admin_token: str, student_token: str, other_student_token: str
+):
+    event = await create_event(client, admin_token, max_participants=1)
+    confirmed = await register(client, event["id"], student_token)
+    waitlisted = await register(client, event["id"], other_student_token)
+    base = f"{BASE}/{event['id']}/participants"
+
+    # Students cannot check anyone in, themselves included.
+    assert (
+        await client.put(
+            f"{base}/{confirmed['id']}/attendance", json={"attended": True},
+            headers=auth_header(student_token),
+        )
+    ).status_code == 403
+
+    # A waitlisted student held no place.
+    held_back = await client.put(
+        f"{base}/{waitlisted['id']}/attendance", json={"attended": True},
+        headers=auth_header(admin_token),
+    )
+    assert held_back.status_code == 400
+
+    # A registration from a different event is not found under this one.
+    other = await create_event(client, admin_token, title="Other")
+    assert (
+        await client.put(
+            f"{BASE}/{other['id']}/participants/{confirmed['id']}/attendance",
+            json={"attended": True}, headers=auth_header(admin_token),
+        )
+    ).status_code == 404
+
+    # Cancelling clears a check-in made before the event.
+    await client.put(
+        f"{base}/{confirmed['id']}/attendance", json={"attended": True},
+        headers=auth_header(admin_token),
+    )
+    await client.delete(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    mine = await my_registrations(client, student_token)
+    assert (mine[0]["status"], mine[0]["attended_at"]) == ("CANCELLED", None)
+
+
+# --- waitlist promotion email ---
+
+
+@pytest.mark.asyncio
+async def test_promoted_students_are_emailed(
+    client: AsyncClient,
+    monkeypatch,
+    admin_token: str,
+    student_token: str,
+    other_student_token: str,
+    third_student_token: str,
+):
+    sent: list[tuple[str, str]] = []
+
+    async def _fake_send(to_email, full_name, event_title, start_date):
+        sent.append((to_email, event_title))
+        return True
+
+    monkeypatch.setattr(email, "send_waitlist_promotion_email", _fake_send)
+
+    event = await create_event(client, admin_token, title="Robotics bootcamp", max_participants=1)
+    await register(client, event["id"], student_token)
+    await register(client, event["id"], other_student_token)
+    await register(client, event["id"], third_student_token)
+    assert sent == []
+
+    await client.delete(f"{BASE}/{event['id']}/register", headers=auth_header(student_token))
+    assert sent == [("grace@unilag.edu.ng", "Robotics bootcamp")]
+
+    await client.put(
+        f"{BASE}/{event['id']}", json={"max_participants": 5}, headers=auth_header(admin_token)
+    )
+    assert sent[1] == ("tolu@unilag.edu.ng", "Robotics bootcamp")
+
+    # Nobody new gets a place, so nobody new gets an email.
+    await client.put(
+        f"{BASE}/{event['id']}", json={"max_participants": 6}, headers=auth_header(admin_token)
+    )
+    assert len(sent) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_failed_promotion_email_does_not_fail_the_cancel(
+    client: AsyncClient, monkeypatch, admin_token: str, student_token: str, other_student_token: str
+):
+    from app.core.config import settings
+
+    async def _broken(*args, **kwargs):
+        raise email.EmailSendError("Brevo is down")
+
+    monkeypatch.setattr(settings, "BREVO_API_KEY", "test-key")
+    monkeypatch.setattr(email, "_send", _broken)
+
+    event = await create_event(client, admin_token, max_participants=1)
+    await register(client, event["id"], student_token)
+    await register(client, event["id"], other_student_token)
+    response = await client.delete(
+        f"{BASE}/{event['id']}/register", headers=auth_header(student_token)
+    )
+    assert response.status_code == 200
+    assert (await my_registrations(client, other_student_token))[0]["status"] == "CONFIRMED"

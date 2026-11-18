@@ -75,6 +75,8 @@ class EventResponse(BaseModel):
     # entitled to it. They default rather than being required so that
     # model_validate() can still read an Event ORM instance directly.
     confirmed_count: int = 0
+    # Confirmed students an admin has checked in.
+    attended_count: int = 0
     # None means unlimited, matching max_participants (Tech Doc §4.2).
     spots_left: int | None = None
 
@@ -87,6 +89,13 @@ class EventRegistrationResponse(BaseModel):
     student_id: str
     status: RegistrationStatus
     registered_at: datetime
+    attended_at: datetime | None = None
+
+
+class AttendanceUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attended: bool
 
 
 class MyRegistrationResponse(EventRegistrationResponse):

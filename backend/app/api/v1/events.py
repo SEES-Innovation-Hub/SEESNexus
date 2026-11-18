@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from app.models.events import Event, EventRegistration, EventType, RegistrationS
 from app.models.user import User, UserRole
 from app.schemas.envelope import success
 from app.schemas.events import (
+    AttendanceUpdate,
     EventCreate,
     EventParticipantResponse,
     EventRegistrationResponse,
@@ -21,6 +22,7 @@ from app.schemas.events import (
     PaginatedEventsResponse,
     RegisterStudentRequest,
 )
+from app.services import email
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -53,10 +55,16 @@ def _event_response(event: Event, viewer: User) -> EventResponse:
     confirmed = sum(
         1 for r in event.registrations if r.status == RegistrationStatus.CONFIRMED
     )
+    attended = sum(
+        1
+        for r in event.registrations
+        if r.status == RegistrationStatus.CONFIRMED and r.attended_at is not None
+    )
     response = EventResponse.model_validate(event)
     return response.model_copy(
         update={
             "confirmed_count": confirmed,
+            "attended_count": attended,
             "spots_left": (
                 None
                 if event.max_participants is None
@@ -115,6 +123,32 @@ async def _promote_waitlisted(db: AsyncSession, event: Event) -> list[EventRegis
     for registration in promoted:
         registration.status = RegistrationStatus.CONFIRMED
     return promoted
+
+
+async def _email_promoted(
+    db: AsyncSession,
+    event: Event,
+    promoted: list[EventRegistration],
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Queue a "you have a place" email for each promoted student.
+
+    Call after the commit: the emails go out once the response is sent, and a
+    failed send never undoes a promotion.
+    """
+    if not promoted:
+        return
+    students = (
+        await db.execute(select(User).where(User.id.in_([r.student_id for r in promoted])))
+    ).scalars().all()
+    for student in students:
+        background_tasks.add_task(
+            email.send_waitlist_promotion_email,
+            student.email,
+            student.full_name,
+            event.title,
+            _as_utc(event.start_date),
+        )
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -240,6 +274,7 @@ async def list_my_registrations(
                 student_id=registration.student_id,
                 status=registration.status,
                 registered_at=registration.registered_at,
+                attended_at=registration.attended_at,
                 waitlist_position=waitlist_position,
                 event_deleted=event.deleted_at is not None,
                 event=_event_response(event, current_user),
@@ -281,6 +316,7 @@ async def create_event(
 async def update_event(
     event_id: str,
     payload: EventUpdate,
+    background_tasks: BackgroundTasks,
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -330,10 +366,12 @@ async def update_event(
 
     # Raising the cap, or clearing it to unlimited, opens places that the
     # waitlist should fill straight away rather than waiting for a cancellation.
+    promoted = []
     if "max_participants" in updates:
-        await _promote_waitlisted(db, event)
+        promoted = await _promote_waitlisted(db, event)
 
     await db.commit()
+    await _email_promoted(db, event, promoted, background_tasks)
     await db.refresh(event)
     return success(data=_serialize_event(event, admin), message="Event updated")
 
@@ -406,6 +444,7 @@ async def register_for_event(
         registration = existing
         registration.status = registration_status
         registration.registered_at = now
+        registration.attended_at = None
     else:
         registration = EventRegistration(
             event_id=event.id,
@@ -432,6 +471,7 @@ async def register_for_event(
 @router.delete("/{event_id}/register")
 async def cancel_registration(
     event_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -466,13 +506,14 @@ async def cancel_registration(
 
     held_a_place = registration.status == RegistrationStatus.CONFIRMED
     registration.status = RegistrationStatus.CANCELLED
+    registration.attended_at = None
     # Flush before promoting, so the count of confirmed places that
     # _promote_waitlisted reads no longer includes this one.
     await db.flush()
-    if held_a_place:
-        await _promote_waitlisted(db, event)
+    promoted = await _promote_waitlisted(db, event) if held_a_place else []
 
     await db.commit()
+    await _email_promoted(db, event, promoted, background_tasks)
     await db.refresh(registration)
     return success(
         data=EventRegistrationResponse.model_validate(registration).model_dump(mode="json"),
@@ -500,9 +541,54 @@ async def list_participants(
             student_id=registration.student_id,
             status=registration.status,
             registered_at=registration.registered_at,
+            attended_at=registration.attended_at,
             student_name=user.full_name,
             student_email=user.email,
         ).model_dump(mode="json")
         for registration, user in result.all()
     ]
     return success(data=data)
+
+
+@router.put("/{event_id}/participants/{registration_id}/attendance")
+async def mark_attendance(
+    event_id: str,
+    registration_id: str,
+    payload: AttendanceUpdate,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Check a student in at the door, or undo a mistaken check-in.
+
+    Only a CONFIRMED registration can be marked: a waitlisted student had no
+    place, and a cancelled one withdrew. Marking twice keeps the first time.
+    """
+    event = await _get_event_or_404(db, event_id)
+    registration = (
+        await db.execute(
+            select(EventRegistration).where(
+                EventRegistration.id == registration_id,
+                EventRegistration.event_id == event.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if registration is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registration not found")
+    if registration.status != RegistrationStatus.CONFIRMED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only a confirmed registration can be marked as attended",
+        )
+
+    if payload.attended:
+        if registration.attended_at is None:
+            registration.attended_at = datetime.now(timezone.utc)
+    else:
+        registration.attended_at = None
+
+    await db.commit()
+    await db.refresh(registration)
+    return success(
+        data=EventRegistrationResponse.model_validate(registration).model_dump(mode="json"),
+        message="Attendance recorded" if payload.attended else "Attendance cleared",
+    )

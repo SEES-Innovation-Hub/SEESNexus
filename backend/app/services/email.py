@@ -1,7 +1,7 @@
 """Transactional email, via Brevo.
 
-There is only one message today -- the registration OTP -- but the provider
-setup belongs in a service rather than in the route, for the same reason as
+Two messages: the registration OTP, and "you are off the waitlist". The
+provider setup lives here rather than in the routes, for the same reason as
 services/loans.py: the route decides policy, this module knows the provider.
 
 Tech Doc §3 names `sib-api-v3-sdk`. Brevo has replaced that package with
@@ -9,7 +9,9 @@ Tech Doc §3 names `sib-api-v3-sdk`. Brevo has replaced that package with
 ship a native async client -- so the send is awaited directly rather than being
 pushed through a threadpool, and nothing blocks the event loop.
 """
+import html
 import logging
+from datetime import datetime
 from typing import Any
 
 from app.core.config import settings
@@ -17,6 +19,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 SUBJECT = "Your SEES Nexus verification code"
+PROMOTION_SUBJECT = "You have a place: {title}"
 
 # Cached per API key: the Brevo client owns an httpx connection pool and exposes
 # no close()/aclose(), so building one per email would leak sockets. Keying the
@@ -61,6 +64,33 @@ def _get_client() -> Any:
     return _client
 
 
+async def _send(to_email: str, subject: str, text_content: str, html_content: str) -> None:
+    """Send one message. Raises EmailSendError on any failure.
+
+    Callers check is_configured() first; this assumes a key is set.
+    """
+    from brevo import SendTransacEmailRequestSender, SendTransacEmailRequestToItem
+
+    try:
+        await _get_client().transactional_emails.send_transac_email(
+            sender=SendTransacEmailRequestSender(
+                email=settings.BREVO_SENDER_EMAIL,
+                name=settings.BREVO_SENDER_NAME,
+            ),
+            to=[SendTransacEmailRequestToItem(email=to_email)],
+            subject=subject,
+            text_content=text_content,
+            html_content=html_content,
+        )
+    except Exception as exc:
+        # Deliberately broad: an outbound HTTP call fails in many ways (Brevo
+        # API errors, DNS, TLS, timeouts) and every one of them means the same
+        # thing to the caller -- the message did not go out. The body is never
+        # logged; for the OTP it is the secret being delivered.
+        logger.error("Could not send %r to %s: %s", subject, to_email, exc)
+        raise EmailSendError("Could not send the email") from exc
+
+
 async def send_otp_email(to_email: str, code: str) -> bool:
     """Email a verification code.
 
@@ -74,27 +104,45 @@ async def send_otp_email(to_email: str, code: str) -> bool:
         logger.warning("BREVO_API_KEY is unset -- no verification email sent to %s", to_email)
         return False
 
-    from brevo import SendTransacEmailRequestSender, SendTransacEmailRequestToItem
-
     text_content, html_content = _body(code)
+    await _send(to_email, SUBJECT, text_content, html_content)
+    return True
 
+
+async def send_waitlist_promotion_email(
+    to_email: str, full_name: str, event_title: str, start_date: datetime
+) -> bool:
+    """Tell a student they moved off the waitlist and now hold a place.
+
+    Best effort, and never raises: it runs as a background task after the
+    response is sent, and the promotion itself has already been committed. A
+    student who misses the email still sees CONFIRMED in the app.
+    """
+    if not is_configured():
+        logger.info("BREVO_API_KEY is unset -- no promotion email sent to %s", to_email)
+        return False
+
+    when = start_date.strftime("%A %d %B %Y, %H:%M UTC")
+    text_content = (
+        f"Hi {full_name},\n\n"
+        f"A place opened up and you have moved off the waitlist for \"{event_title}\".\n"
+        f"Your registration is now confirmed. The event starts {when}.\n\n"
+        "If you can no longer go, please cancel in SEES Nexus so the next person gets the place.\n"
+    )
+    html_content = (
+        f"<p>Hi {html.escape(full_name)},</p>"
+        f"<p>A place opened up and you have moved off the waitlist for "
+        f"<strong>{html.escape(event_title)}</strong>. Your registration is now confirmed. "
+        f"The event starts {when}.</p>"
+        "<p>If you can no longer go, please cancel in SEES Nexus so the next person gets the place.</p>"
+    )
     try:
-        await _get_client().transactional_emails.send_transac_email(
-            sender=SendTransacEmailRequestSender(
-                email=settings.BREVO_SENDER_EMAIL,
-                name=settings.BREVO_SENDER_NAME,
-            ),
-            to=[SendTransacEmailRequestToItem(email=to_email)],
-            subject=SUBJECT,
-            text_content=text_content,
-            html_content=html_content,
+        await _send(
+            to_email,
+            PROMOTION_SUBJECT.format(title=event_title)[:200],
+            text_content,
+            html_content,
         )
-    except Exception as exc:
-        # Deliberately broad: an outbound HTTP call fails in many ways (Brevo
-        # API errors, DNS, TLS, timeouts) and every one of them means the same
-        # thing to the caller -- the code did not go out. The code itself is
-        # never logged; it is the secret being delivered.
-        logger.error("Could not send the verification email to %s: %s", to_email, exc)
-        raise EmailSendError("Could not send the verification email") from exc
-
+    except EmailSendError:
+        return False
     return True
