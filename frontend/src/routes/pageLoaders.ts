@@ -2,11 +2,17 @@
 // React.lazy using these loaders, and prefetchPages() calls the very same dynamic
 // imports early, so the browser already has the code when the route is opened.
 export const pageLoaders = {
-  // The sidebar frame around every signed-in page (not a page itself).
+  // The sidebar frame around the app's inner pages (not a page itself).
   appLayout: () => import("../layouts/AppLayout"),
   login: () => import("../pages/auth/Login"),
   register: () => import("../pages/auth/Register"),
   profile: () => import("../pages/profile/Profile"),
+  projectsList: () => import("../pages/projects/ProjectsList"),
+  projectDetail: () => import("../pages/projects/ProjectDetail"),
+  newProject: () => import("../pages/projects/NewProject"),
+  editProject: () => import("../pages/projects/EditProject"),
+  hardwareList: () => import("../pages/hardware/HardwareList"),
+  myLoans: () => import("../pages/loans/MyLoans"),
 };
 
 export type PageName = keyof typeof pageLoaders;
@@ -15,14 +21,32 @@ const PAGE_FOR_PATH: Record<string, PageName> = {
   "/login": "login",
   "/register": "register",
   "/profile": "profile",
+  "/projects": "projectsList",
+  "/projects/new": "newProject",
+  "/hardware": "hardwareList",
+  "/loans": "myLoans",
 };
+
+// Paths with an id in them, checked when there is no exact match above.
+const PAGE_FOR_PATTERN: [RegExp, PageName][] = [
+  [/^\/projects\/[^/]+\/edit$/, "editProject"],
+  [/^\/projects\/[^/]+$/, "projectDetail"],
+];
 
 // Pages shown inside AppLayout: prefetching one also fetches the layout, or
 // opening it would still wait for the sidebar's code.
-const SIGNED_IN_PAGES: ReadonlySet<PageName> = new Set(["profile"]);
+const LAYOUT_PAGES: ReadonlySet<PageName> = new Set([
+  "profile",
+  "projectsList",
+  "projectDetail",
+  "newProject",
+  "editProject",
+  "hardwareList",
+  "myLoans",
+]);
 
 export function prefetchPages(...names: PageName[]) {
-  if (names.some((name) => SIGNED_IN_PAGES.has(name))) names = [...names, "appLayout"];
+  if (names.some((name) => LAYOUT_PAGES.has(name))) names = [...names, "appLayout"];
   for (const name of names) {
     // Best-effort: if the download fails, opening the route simply retries it.
     pageLoaders[name]().catch(() => undefined);
@@ -30,6 +54,6 @@ export function prefetchPages(...names: PageName[]) {
 }
 
 export function prefetchPageForPath(path: string) {
-  const name = PAGE_FOR_PATH[path];
+  const name = PAGE_FOR_PATH[path] ?? PAGE_FOR_PATTERN.find(([pattern]) => pattern.test(path))?.[1];
   if (name) prefetchPages(name);
 }

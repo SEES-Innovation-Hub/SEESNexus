@@ -3,6 +3,7 @@ import { useId, useRef } from "react";
 import { Link } from "react-router-dom";
 import Avatar from "../../components/Avatar";
 import { useAuth } from "../../hooks/useAuth";
+import { useLogout } from "../../hooks/useLogout";
 
 const itemClassName =
   "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-white/80 hover:bg-sees-mint/10 hover:text-white";
@@ -12,10 +13,12 @@ const itemClassName =
 // anywhere else and sits above everything, with no JavaScript of our own.
 // It is pinned to the bottom-left corner, where the sidebar always is.
 export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const logout = useLogout();
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // ProtectedRoute never renders the layout without a user; this narrows the type.
   if (!user) return null;
 
   return (
@@ -71,3 +74,4 @@ export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavi
     </div>
   );
 }
+

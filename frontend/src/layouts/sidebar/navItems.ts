@@ -1,4 +1,4 @@
-import { UserRound, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Cpu, FolderKanban, UserRound, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -15,11 +15,16 @@ export interface NavGroup {
 
 // Every link in the sidebar. Add a link here only once its page exists, so
 // nobody can click into a "Page not found". Planned, in order:
-//   General: Projects (Phase 1), Hardware + My Loans (Phase 2), Events (Phase 4)
+//   General: Events (Phase 4)
 //   Admin:   Overview, Users, Loan requests, Hardware, Projects (Phase 3)
 export const navGroups: NavGroup[] = [
   {
     label: "General",
-    items: [{ label: "Profile", to: "/profile", icon: UserRound }],
+    items: [
+      { label: "Projects", to: "/projects", icon: FolderKanban },
+      { label: "Hardware", to: "/hardware", icon: Cpu },
+      { label: "My Loans", to: "/loans", icon: ArrowLeftRight },
+      { label: "Profile", to: "/profile", icon: UserRound },
+    ],
   },
 ];

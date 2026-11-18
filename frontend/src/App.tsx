@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
+import GuestRoute from "./components/GuestRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Landing } from "./pages/landing/Landing";
 import { NotFound } from "./pages/notfound/NotFound";
@@ -13,6 +14,12 @@ const Login = lazy(() => pageLoaders.login().then((m) => ({ default: m.Login }))
 const Register = lazy(() => pageLoaders.register().then((m) => ({ default: m.Register })));
 const AppLayout = lazy(() => pageLoaders.appLayout().then((m) => ({ default: m.AppLayout })));
 const Profile = lazy(() => pageLoaders.profile().then((m) => ({ default: m.Profile })));
+const ProjectsList = lazy(() => pageLoaders.projectsList().then((m) => ({ default: m.ProjectsList })));
+const ProjectDetail = lazy(() => pageLoaders.projectDetail().then((m) => ({ default: m.ProjectDetail })));
+const NewProject = lazy(() => pageLoaders.newProject().then((m) => ({ default: m.NewProject })));
+const EditProject = lazy(() => pageLoaders.editProject().then((m) => ({ default: m.EditProject })));
+const HardwareList = lazy(() => pageLoaders.hardwareList().then((m) => ({ default: m.HardwareList })));
+const MyLoans = lazy(() => pageLoaders.myLoans().then((m) => ({ default: m.MyLoans })));
 const ComponentsPreview = lazy(() =>
   import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
 );
@@ -26,11 +33,33 @@ function App() {
     // spinner would only flash for the few milliseconds a small chunk takes.
     <Suspense fallback={null}>
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        {/* Signed-in pages share the sidebar layout. Admin-only pages will go in
-            a nested route wrapped in AdminRoute (Phase 3). */}
+        {/* Visitors only: signed-in members are taken into the app. */}
+        <Route
+          path="/"
+          element={
+            <GuestRoute>
+              <Landing />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <GuestRoute>
+              <Login />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <GuestRoute>
+              <Register />
+            </GuestRoute>
+          }
+        />
+        {/* Everything inside the app is for signed-in members. Admin-only pages will additionally be
+            wrapped in AdminRoute (Phase 3). */}
         <Route
           element={
             <ProtectedRoute>
@@ -38,6 +67,12 @@ function App() {
             </ProtectedRoute>
           }
         >
+          <Route path="/projects" element={<ProjectsList />} />
+          <Route path="/projects/new" element={<NewProject />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/projects/:id/edit" element={<EditProject />} />
+          <Route path="/hardware" element={<HardwareList />} />
+          <Route path="/loans" element={<MyLoans />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
         {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}

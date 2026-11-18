@@ -1,7 +1,9 @@
 import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { redirectPathForRole } from "../utils/redirectPathForRole";
 import { SidebarNav } from "./sidebar/SidebarNav";
 import { UserMenu } from "./sidebar/UserMenu";
 
@@ -33,10 +35,12 @@ function saveCollapsed(collapsed: boolean) {
 const iconButtonClassName =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-white/60 hover:bg-sees-mint/5 hover:text-white";
 
+// Goes to the member's home page; Landing is only for visitors.
 function Logo({ collapsed = false }: { collapsed?: boolean }) {
+  const { user } = useAuth();
   return (
     <Link
-      to="/"
+      to={user ? redirectPathForRole(user.role) : "/"}
       aria-label={collapsed ? "SEES Nexus home" : undefined}
       className="inline-flex min-h-11 min-w-0 items-center gap-2 font-semibold text-sees-mint"
     >

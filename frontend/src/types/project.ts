@@ -24,6 +24,19 @@ export interface Project {
   updated_at: string;
 }
 
+// The body of POST /projects and PUT /projects/:id (ProjectCreateRequest /
+// ProjectUpdateRequest). member_ids replaces the whole member list when sent.
+export interface ProjectPayload {
+  title: string;
+  description: string;
+  tech_stack: string[];
+  category: ProjectCategory;
+  status: ProjectStatus;
+  github_url: string | null;
+  demo_url: string | null;
+  member_ids?: string[];
+}
+
 export interface PaginatedProjects {
   items: Project[];
   page: number;

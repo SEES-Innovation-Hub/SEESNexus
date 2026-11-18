@@ -1,14 +1,11 @@
 import type { Project, ProjectMember } from "../../types/project";
+import { isHttpUrl } from "../../utils/isHttpUrl";
 import { CATEGORY_LABELS, STATUS_LABELS } from "../../utils/projectLabels";
+import Badge from "../Badge";
+import PrefetchLink from "../PrefetchLink";
 
 const MAX_TECH_BADGES = 4;
 const MAX_MEMBER_AVATARS = 4;
-
-// Project links are user-supplied and this page is public: only http(s) is safe
-// to use as an href (a "javascript:" URL would run script on click).
-function isHttpUrl(value: string | null): value is string {
-  return value !== null && /^https?:\/\//i.test(value);
-}
 
 function MemberAvatar({ member }: { member: ProjectMember }) {
   const className =
@@ -38,14 +35,18 @@ function MemberAvatar({ member }: { member: ProjectMember }) {
 }
 
 // py-3 with -my-3 grows the tap area to 44px without growing the card.
+// relative z-10 lifts the links above the card-wide project link.
 const linkClassName =
-  "-mx-1.5 -my-3 px-1.5 py-3 text-sees-mustard underline hover:text-sees-mint";
+  "relative z-10 -mx-1.5 -my-3 px-1.5 py-3 text-sees-mustard underline hover:text-sees-mint";
 
-export function ProjectCard({ project }: { project: Project }) {
+// The width comes from the parent (a fixed width in Landing's rail, a grid
+// column on the Projects page). The whole card opens the project: the title's
+// link is stretched over the card with an ::after layer.
+export default function ProjectCard({ project }: { project: Project }) {
   const extraTech = project.tech_stack.length - MAX_TECH_BADGES;
 
   return (
-    <article className="w-72 shrink-0 snap-start overflow-hidden rounded-2xl border border-sees-teal/40 bg-gradient-card shadow-sees-card transition-transform duration-200 focus-within:z-10 focus-within:scale-105 hover:z-10 hover:scale-105">
+    <article className="relative h-full overflow-hidden rounded-2xl border border-sees-teal/40 bg-gradient-card shadow-sees-card transition-colors hover:border-sees-mint/50">
       {project.thumbnail_url ? (
         <img
           src={project.thumbnail_url}
@@ -66,16 +67,19 @@ export function ProjectCard({ project }: { project: Project }) {
       )}
 
       <div className="space-y-3 p-4">
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full border border-sees-mint/40 px-2 py-0.5 text-sees-mint">
-            {CATEGORY_LABELS[project.category]}
-          </span>
-          <span className="rounded-full border border-sees-mustard/40 px-2 py-0.5 text-sees-mustard">
-            {STATUS_LABELS[project.status]}
-          </span>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone="mint">{CATEGORY_LABELS[project.category]}</Badge>
+          <Badge tone="mustard">{STATUS_LABELS[project.status]}</Badge>
         </div>
 
-        <h3 className="text-lg font-semibold wrap-anywhere text-white">{project.title}</h3>
+        <h3 className="text-lg font-semibold wrap-anywhere text-white">
+          <PrefetchLink
+            to={`/projects/${project.id}`}
+            className="after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-sees-mint"
+          >
+            {project.title}
+          </PrefetchLink>
+        </h3>
         <p className="line-clamp-3 wrap-anywhere text-sm text-white/70">{project.description}</p>
 
         {project.tech_stack.length > 0 && (

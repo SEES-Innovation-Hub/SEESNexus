@@ -4,7 +4,7 @@ import { listProjects } from "../api/projects";
 import { queryKeys } from "../api/queryKeys";
 import type { PaginatedProjects, Project } from "../types/project";
 
-export type ProjectsState =
+export type ShowcaseState =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; projects: Project[]; total: number };
@@ -47,7 +47,7 @@ function writeCache(pageSize: number, page: PaginatedProjects) {
 }
 
 // The newest `pageSize` projects, for the Landing showcase rail.
-export function useProjects(pageSize: number): ProjectsState {
+export function useShowcaseProjects(pageSize: number): ShowcaseState {
   // Read once per mount: parsing storage on every render would be wasted work.
   const [saved] = useState(() => readCache(pageSize));
   const query = useQuery({

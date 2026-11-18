@@ -39,37 +39,52 @@ src/
     sidebar/SidebarNav.tsx     the grouped links (expanded or icons-only)
     sidebar/UserMenu.tsx       the signed-in person + Profile / Log out menu
   api/
-    client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage()
+    client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
-    projects.ts                listProjects (public; page, pageSize, category, status)
+    projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
+    hardware.ts                listHardware, getHardware (public); requestLoan, listMyLoans, returnLoan
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
     tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
     upload.ts                  uploadImage (assumed /upload/image contract)
     imageGeneration.ts         generateImage (calls the image service directly)
-  types/                       hand-written types mirroring the backend schemas (auth, project, envelope)
+  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, envelope)
   context/
     AuthContext.ts             the context + its value type
     AuthProvider.tsx           session state and actions (login, logout, updateProfile)
     ToastContext.ts / ToastProvider.tsx   the toast messages (showToast) and where they render
   hooks/
     useAuth.ts                 the only way components read the session
-    useProjects.ts             Landing's project list (useQuery + a remembered copy)
+    useLogout.ts               what every "Log out" button calls (§3.2)
+    useShowcaseProjects.ts     Landing's rail (useQuery + a remembered copy, §3.5)
+    useProjectList.ts          a page of projects with filters (Projects page)
+    useProject.ts              one project (shows a list's copy instantly, §3.12)
+    useCreateProject.ts / useUpdateProject.ts / useDeleteProject.ts   changes; each refreshes the lists
+    useUrlFilters.ts           filters + page in the address bar, shared by list pages (§3.13)
+    useHardwareList.ts         a page of hardware with filters
+    useMyLoans.ts              the signed-in person's loans (off for visitors)
+    useHardwareNames.ts        names of the items loans point to (temporary, §3.13)
+    useRequestLoan.ts / useReturnLoan.ts   loan actions
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
     useToast.ts                the only way components show a toast
     useModalDialog.ts          opens/closes a native <dialog> as a modal (Modal + the phone drawer)
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    Avatar/  ProtectedRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/      (see §3.10 for what each is for)
+    Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
-    landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail, ProjectCard,
+    landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail,
                PillarsSection, TeamSection, JoinSection, LandingFooter
     auth/      Login, Register, OtpVerification
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
+    projects/  ProjectsList, ProjectDetail, NewProject, EditProject, ProjectForm, TechStackInput,
+               ProjectNotFound, projectFormValues (values, limits, validation)
+    hardware/  HardwareList, HardwareCard, LoanRequestModal, cardActionId
+    loans/     MyLoans, LoanCard
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
-  utils/       redirectPathForRole, projectLabels
+  utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
+               isHttpUrl, canEditProject, returnPath
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -93,7 +108,9 @@ Errors: `errorMessage(error, "fallback text")` returns the backend's own message
 
 ### 3.2 The session (`AuthProvider` + `client.ts`)
 - **On app start**, if a token is stored (read through `tokenStore`), `AuthProvider` calls `GET /auth/me`. While that runs `isLoading` is true, so `ProtectedRoute` waits instead of redirecting a signed-in user.
-- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. `redirectPathForRole` decides where to go.
+- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. It goes to the page the person wanted (`returnPath`, see §3.11) or else their home, `redirectPathForRole` (Projects for every role until the Phase 3 Dashboard).
+- **Who sees what:** visitors get only Landing, `/login` and `/register`. `GuestRoute` sends a signed-in member away from those three to their home, so they never see Landing again until they log out. Every app page sits inside one `ProtectedRoute`.
+- **Log out** (`useLogout()`) clears the tokens and records the page it was pressed on (`loggedOutAt` = that page's `location.key`). `ProtectedRoute` sends exactly that page to Landing. Any later visit to an app page (a showcase card, Back) goes to login as usual. Keying it to one history entry, rather than a flag that stays on, is what stops "after logging out, clicking a project bounces back to Landing".
 - **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
 - **A dead refresh token:** the client clears the tokens and calls the handler `AuthProvider` registered, which empties the user; `ProtectedRoute` then redirects to `/login`. Public pages are untouched.
 - **Blocked storage:** `tokenStore` keeps the tokens in `localStorage`; if the browser throws on every storage call it falls back to memory, so the app still renders and login works until the tab closes.
@@ -128,7 +145,7 @@ What we get for free: one request even if two components ask for the same data, 
 - **On login, logout and session expiry** `AuthProvider` empties the whole cache, so one person's private data (their loans, the admin's user list) never shows to the next person on a shared computer.
 - The signed-in user is **not** in the query cache; it stays in `AuthProvider` (§3.2).
 
-### 3.5 The project rail (`useProjects`)
+### 3.5 The project rail (`useShowcaseProjects`)
 ```
 first render:  readCache() ── found & fresh (≤ 7 days)? ─► show those cards immediately (marked stale)
                         └── else ► skeleton
@@ -189,27 +206,64 @@ All in `src/components/`, one folder each, default export. See every one of them
 | `TextField`, `TextArea`, `Select` | Form fields | Built on `Field` (label + hint + error). `error` turns the border red and is read out by screen readers. Optional fields are labelled "(optional)" automatically. |
 | `Avatar` | A person's photo or initial | `name`, `imageUrl`, `size` (px). Decorative: put the name next to it. |
 | `AdminRoute` | Wrapping admin-only pages | Not signed in → `/login`; not an admin → their own start page. The backend enforces the real rule. |
+| `ProjectCard` | A project in a list | The whole card links to the project; the parent sets its width (rail: fixed, Projects page: grid column). |
 | `useToast().showToast(msg, tone?)` | Short feedback after an action | `"success"` (default) or `"error"`; fades after 5 s, max 3 at once. |
 
 ### 3.11 The signed-in layout (sidebar)
 ```
 App.tsx
   <Route element={<ProtectedRoute><AppLayout/></ProtectedRoute>}>
-     <Route path="/profile" … />          ← every signed-in page goes here
+     <Route path="/projects" … />      ← every app page goes here: members only
+     <Route path="/profile" … />
   </Route>
+  Landing, /login and /register are the only public pages.
 AppLayout
   laptop (≥1024px): <aside> sidebar  (logo · collapse button · SidebarNav · UserMenu)
   below 1024px:     top bar with ☰  → the same sidebar in a <dialog> drawer
   <main id="main"> <Suspense> <Outlet/>   ← the page
 ```
 - **Links** come from `layouts/sidebar/navItems.ts`, in groups ("General", later "Admin" with `adminOnly: true`). A link is added only when its page exists.
+- **Members only:** visitors who open any app page are sent to `/login` by `ProtectedRoute`, which passes the page they wanted as navigation state (`{ from }`). After logging in, `Login` takes them back there (`utils/returnPath.ts` only accepts same-site paths). Without a `from`, login goes to the role's start page as before.
 - **Active link:** `NavLink` highlights the open page and sets `aria-current="page"`.
 - **Collapse** (laptop only) shrinks the sidebar to icons and is remembered in `localStorage` (`sees.sidebar.collapsed`, inside try/catch). Collapsed labels stay readable by screen readers, and hovering shows a tooltip.
 - **Phone drawer** uses `useModalDialog`, so focus trap, Esc, focus return and scroll lock work like `Modal`. It closes on a link, Esc, a tap outside, or when the window grows to laptop size. It slides in and out (and the backdrop fades); the slide-out relies on `transition-discrete`, so browsers without it just close instantly. Reduced-motion users get no animation.
 - **User menu** uses the browser's `popover` attribute (closes on Esc or click-away, no JS of ours). It is pinned to the bottom-left, where the sidebar always is.
 - **Skip link:** the first Tab on any signed-in page focuses "Skip to content", which jumps past the sidebar.
-- **Loading:** `AppLayout` is its own chunk (~4 KB gz), so Landing never downloads it. Prefetching a signed-in page also prefetches the layout (`SIGNED_IN_PAGES` in `pageLoaders.ts`).
+- **Loading:** `AppLayout` is its own chunk (~4 KB gz), so Landing never downloads it. Prefetching any page inside it also prefetches the layout (`LAYOUT_PAGES` in `pageLoaders.ts`). Links with an id (`/projects/abc`) are matched by `PAGE_FOR_PATTERN`.
 - **Icons:** `lucide-react`. Import each icon by name; only the icons used end up in the bundle. Always pass `aria-hidden="true"` next to visible text.
+
+### 3.12 Projects
+| Route | Who | Page |
+|---|---|---|
+| `/projects` | signed in | `ProjectsList`: category/status filters, 12 per page |
+| `/projects/:id` | signed in | `ProjectDetail`: Edit/Delete only when `canEditProject` |
+| `/projects/new` | signed in | `NewProject` → `ProjectForm` |
+| `/projects/:id/edit` | creator or admin | `EditProject` → `ProjectForm`; others see "You can't edit this project" |
+
+- **Filters and page live in the address bar** (`?category=IOT&status=COMPLETED&page=2`) via `useUrlFilters` (§3.13). Back/Forward and shared links work, and no effect syncs them. Unknown values (typed by hand) count as "no filter" (`isProjectCategory` / `isProjectStatus`). Changing a filter returns to page 1.
+- **While the next page loads** the old cards stay, dimmed (`keepPreviousData`), instead of flashing to skeletons.
+- **Opening a project from a list is instant:** `useProject` uses the list's copy as placeholder data while the fresh record loads. `EditProject` waits for the fresh record, because the form copies its starting values once.
+- **Permissions** come from `utils/canEditProject.ts`, which mirrors the backend rule (creator or admin). The UI only hides what can't be done; the backend still decides.
+- **`ProjectForm`** owns the field values and validation (`projectFormValues.ts`: limits copied from the backend schema, per-field messages, and `toPayload` turning empty links into `null`). The pages decide what Save does. `noValidate` replaces the browser's popups with our own messages, and the first invalid field gets focus.
+- **Tech stack** chips: Enter or comma adds one, Backspace on an empty box removes the last, and text left in the box is added when it loses focus. Max 20 chips of 50 characters (backend limits).
+- **Members:** on create the creator is sent as the only member (`member_ids: [user.id]`). Edit never sends `member_ids`, so the backend keeps the team. A member picker needs a user-search endpoint the backend doesn't have yet.
+- **No thumbnail field** until `/upload/image` exists. Cards and the detail page show the category as a stand-in.
+- **After a change:** create/update put the new record straight into the detail cache and refresh every list. Delete removes the detail and refreshes the lists.
+
+### 3.13 Hardware and loans
+| Route | Who | Page |
+|---|---|---|
+| `/hardware` | signed in | `HardwareList`: category/availability filters, 12 per page; "Request loan" opens `LoanRequestModal` |
+| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected) |
+
+- **Shared list filters:** `useUrlFilters()` gives `page`, `read(name, guard)` (a value only counts if the guard recognises it), `setFilter` (returns to page 1), `setPage` (scrolls to the top) and `clearAll`. Projects and Hardware both use it.
+- **The card's action matches what the backend would allow:** your pending/approved loan → a link to My Loans. Under maintenance or none left → the reason. Otherwise "Request loan". The backend refuses duplicates, maintenance items and empty shelves, so nobody fills in a request that's bound to fail.
+- **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once. `useReturnLoan` refreshes My Loans and the hardware lists.
+- **Focus after a request:** the card's button is replaced by a link, so the dialog can't return focus to it. `HardwareList` focuses the new link (`cardActionId`) two frames after closing. Cancelling still returns focus to the button the normal way.
+- **Return date:** optional, can't be before tomorrow, sent as the end of that day in the borrower's time zone.
+- **Loan names are a stopgap:** loans only carry `hardware_id`, so `useHardwareNames` fetches each distinct item once (cached for an hour). Remove it when the backend includes the name (DECISIONS open item 16).
+- **Overdue:** an approved loan past its due date gets a red "Overdue" badge.
+- **Not here:** adding, editing or retiring hardware and approving or rejecting loans are admin pages (Phase 3). There's no "cancel my request" endpoint.
 
 ## 4. Every `useEffect` and why it exists
 

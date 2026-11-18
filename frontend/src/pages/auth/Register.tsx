@@ -66,8 +66,8 @@ export function Register() {
   async function handleCodeVerified(code: string) {
     setError(null);
     setIsSubmitting(true);
-    // Overlaps the Profile download with account creation and login.
-    prefetchPages("profile");
+    // Overlaps the home page's download with account creation and login.
+    prefetchPages("projectsList");
     try {
       await authApi.register({ ...details, verification_code: code });
       const loggedInUser = await login(details.email, details.password);
