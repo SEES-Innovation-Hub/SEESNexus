@@ -1,12 +1,13 @@
-import { Cpu, Plus } from "lucide-react";
+import { CalendarDays, Cpu, Plus } from "lucide-react";
 import { buttonClassName } from "../../components/Button/buttonClassName";
 import PrefetchLink from "../../components/PrefetchLink";
 import { useAuth } from "../../hooks/useAuth";
 import { DashboardLoans } from "./DashboardLoans";
 import { LatestProjects } from "./LatestProjects";
+import { UpcomingEvents } from "./UpcomingEvents";
 
 // A member's home page. Each section loads its own data, so one slow or failing
-// request doesn't hold up the rest. Upcoming events join in Phase 4.
+// request doesn't hold up the rest.
 export function Dashboard() {
   const { user } = useAuth();
 
@@ -24,6 +25,10 @@ export function Dashboard() {
             <Plus aria-hidden="true" className="size-4" />
             New project
           </PrefetchLink>
+          <PrefetchLink to="/events" className={buttonClassName("secondary")}>
+            <CalendarDays aria-hidden="true" className="size-4" />
+            Find an event
+          </PrefetchLink>
           <PrefetchLink to="/hardware" className={buttonClassName("secondary")}>
             <Cpu aria-hidden="true" className="size-4" />
             Borrow hardware
@@ -31,6 +36,7 @@ export function Dashboard() {
         </div>
       </div>
 
+      <UpcomingEvents />
       <DashboardLoans />
       <LatestProjects />
     </div>

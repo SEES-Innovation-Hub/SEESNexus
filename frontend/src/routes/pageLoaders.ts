@@ -18,6 +18,16 @@ export const pageLoaders = {
   adminLoans: () => import("../pages/admin/AdminLoans"),
   adminUsers: () => import("../pages/admin/AdminUsers"),
   adminHardware: () => import("../pages/admin/AdminHardware"),
+  eventsList: () => import("../pages/events/EventsList"),
+  eventDetail: () => import("../pages/events/EventDetail"),
+  myEvents: () => import("../pages/events/MyEvents"),
+  newEvent: () => import("../pages/events/NewEvent"),
+  editEvent: () => import("../pages/events/EditEvent"),
+  eventParticipants: () => import("../pages/events/EventParticipants"),
+  articlesList: () => import("../pages/articles/ArticlesList"),
+  articleDetail: () => import("../pages/articles/ArticleDetail"),
+  newArticle: () => import("../pages/articles/NewArticle"),
+  editArticle: () => import("../pages/articles/EditArticle"),
 };
 
 export type PageName = keyof typeof pageLoaders;
@@ -35,12 +45,22 @@ const PAGE_FOR_PATH: Record<string, PageName> = {
   "/admin/loans": "adminLoans",
   "/admin/users": "adminUsers",
   "/admin/hardware": "adminHardware",
+  "/events": "eventsList",
+  "/events/new": "newEvent",
+  "/my-events": "myEvents",
+  "/articles": "articlesList",
+  "/articles/new": "newArticle",
 };
 
 // Paths with an id in them, checked when there is no exact match above.
 const PAGE_FOR_PATTERN: [RegExp, PageName][] = [
   [/^\/projects\/[^/]+\/edit$/, "editProject"],
   [/^\/projects\/[^/]+$/, "projectDetail"],
+  [/^\/events\/[^/]+\/edit$/, "editEvent"],
+  [/^\/events\/[^/]+\/participants$/, "eventParticipants"],
+  [/^\/events\/[^/]+$/, "eventDetail"],
+  [/^\/articles\/[^/]+\/edit$/, "editArticle"],
+  [/^\/articles\/[^/]+$/, "articleDetail"],
 ];
 
 // Pages shown inside AppLayout: prefetching one also fetches the layout, or
@@ -58,6 +78,16 @@ const LAYOUT_PAGES: ReadonlySet<PageName> = new Set([
   "adminLoans",
   "adminUsers",
   "adminHardware",
+  "eventsList",
+  "eventDetail",
+  "myEvents",
+  "newEvent",
+  "editEvent",
+  "eventParticipants",
+  "articlesList",
+  "articleDetail",
+  "newArticle",
+  "editArticle",
 ]);
 
 export function prefetchPages(...names: PageName[]) {

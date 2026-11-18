@@ -50,7 +50,13 @@ def _slugify(title: str) -> str:
     return slug[:240].rstrip("-") or "article"
 
 
+# Addresses the frontend uses for its own pages (/articles/new).
+RESERVED_SLUGS = frozenset({"new"})
+
+
 async def _slug_taken(db: AsyncSession, slug: str, exclude_id: str | None = None) -> bool:
+    if slug in RESERVED_SLUGS:
+        return True
     stmt = select(Article.id).where(Article.slug == slug)
     if exclude_id is not None:
         stmt = stmt.where(Article.id != exclude_id)

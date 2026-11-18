@@ -237,3 +237,13 @@ async def test_delete_is_soft_and_restricted(
     # The deleted row keeps its slug, so a new article with the same title gets "-2".
     replacement = await create_article(client, contributor_token)
     assert replacement["slug"] == f"{article['slug']}-2"
+
+
+async def test_reserved_slug_is_never_used(client: AsyncClient, contributor_token: str):
+    # /articles/new is the frontend's "write an article" page.
+    generated = await create_article(client, contributor_token, title="New")
+    assert generated["slug"] == "new-2"
+    explicit = await client.post(
+        BASE, json=article_payload(slug="new"), headers=auth_header(contributor_token)
+    )
+    assert explicit.status_code == 409

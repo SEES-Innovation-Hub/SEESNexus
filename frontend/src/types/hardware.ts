@@ -1,7 +1,8 @@
 // Mirrors backend/app/schemas/hardware.py and models/hardware.py — keep in sync.
 export type HardwareCategory = "MEASUREMENT" | "MICROCONTROLLER" | "COMPONENT";
 export type HardwareStatus = "AVAILABLE" | "BORROWED" | "MAINTENANCE";
-export type LoanStatus = "PENDING" | "APPROVED" | "RETURNED" | "REJECTED";
+// CANCELLED: the borrower withdrew the request before an admin decided.
+export type LoanStatus = "PENDING" | "APPROVED" | "RETURNED" | "REJECTED" | "CANCELLED";
 
 export interface Hardware {
   id: string;
@@ -28,6 +29,8 @@ export interface PaginatedHardware {
 export interface Loan {
   id: string;
   hardware_id: string;
+  // The item's name, sent with every loan so lists need no extra lookups.
+  hardware_name: string | null;
   borrower_id: string;
   approved_by_id: string | null;
   status: LoanStatus;

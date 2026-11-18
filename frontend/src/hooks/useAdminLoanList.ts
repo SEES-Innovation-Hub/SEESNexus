@@ -1,15 +1,12 @@
 import type { User } from "../types/auth";
 import { useAdminLoans } from "./useAdminLoans";
 import { useAdminUsers } from "./useAdminUsers";
-import { useHardwareNames } from "./useHardwareNames";
 
-// Loans carry only ids, so the admin pages join them with the user list (for
-// the borrower) and the hardware lookups (for the item name).
+// Loans carry the borrower's id only, so the admin pages join them with the
+// user list. (The item's name comes with each loan.)
 export function useAdminLoanList() {
   const loansQuery = useAdminLoans();
   const { data: users } = useAdminUsers();
-  const loans = loansQuery.data ?? [];
-  const itemNames = useHardwareNames(loans.map((loan) => loan.hardware_id));
   const borrowers = new Map<string, User>((users ?? []).map((user) => [user.id, user]));
 
   return {
@@ -18,7 +15,6 @@ export function useAdminLoanList() {
     isError: loansQuery.isError,
     isFetching: loansQuery.isFetching,
     refetch: loansQuery.refetch,
-    itemNames,
     borrowers,
   };
 }

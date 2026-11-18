@@ -7,6 +7,7 @@ import Card from "../../components/Card";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { useApproveLoan } from "../../hooks/useApproveLoan";
 import { useRejectLoan } from "../../hooks/useRejectLoan";
+import { useReturnLoan } from "../../hooks/useReturnLoan";
 import { useToast } from "../../hooks/useToast";
 import type { User } from "../../types/auth";
 import type { Loan } from "../../types/hardware";
@@ -16,19 +17,21 @@ import { loanDateSummary } from "../../utils/loanDates";
 
 interface AdminLoanCardProps {
   loan: Loan;
-  // undefined while the lookups are still loading.
-  itemName: string | undefined;
+  // undefined while the member list is still loading.
   borrower: User | undefined;
 }
 
-// One loan for an admin: what, who, why, when, and (while pending) the
-// decision. Approving needs no confirmation; rejecting does.
-export function AdminLoanCard({ loan, itemName, borrower }: AdminLoanCardProps) {
+// One loan for an admin: what, who, why, when, and the next step: a decision
+// while pending, checking the item back in while it's out. Approving needs no
+// confirmation; rejecting and returning do.
+export function AdminLoanCard({ loan, borrower }: AdminLoanCardProps) {
   const approve = useApproveLoan();
   const reject = useRejectLoan();
+  const giveBack = useReturnLoan();
   const { showToast } = useToast();
   const [confirmingReject, setConfirmingReject] = useState(false);
-  const item = itemName ?? "this item";
+  const [confirmingReturn, setConfirmingReturn] = useState(false);
+  const item = loan.hardware_name ?? "this item";
   const who = borrower?.full_name ?? "the member";
 
   function handleApprove() {
@@ -46,11 +49,19 @@ export function AdminLoanCard({ loan, itemName, borrower }: AdminLoanCardProps) 
     });
   }
 
+  function handleReturn() {
+    giveBack.mutate(loan.id, {
+      onSuccess: () => showToast(`${item} is back on the shelf.`),
+      onError: (error) => showToast(errorMessage(error, "Couldn't check the item in. Try again."), "error"),
+      onSettled: () => setConfirmingReturn(false),
+    });
+  }
+
   return (
     <Card as="article" className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 className="text-lg font-semibold wrap-anywhere text-white">
-          {itemName ?? <span className="text-white/40">Loading item…</span>}
+          {item}
         </h3>
         <div className="flex flex-wrap gap-2">
           {isOverdue(loan) && <Badge tone="red">Overdue</Badge>}
@@ -89,6 +100,25 @@ export function AdminLoanCard({ loan, itemName, borrower }: AdminLoanCardProps) 
           </Button>
         </div>
       )}
+
+      {loan.status === "APPROVED" && (
+        <div className="pt-1">
+          <Button variant="secondary" onClick={() => setConfirmingReturn(true)}>
+            Mark returned
+          </Button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmingReturn}
+        title="Check this item back in?"
+        message={`Only do this once ${item} is physically back at the lab. It becomes available to borrow again.`}
+        confirmLabel="Mark returned"
+        tone="primary"
+        onConfirm={handleReturn}
+        onCancel={() => setConfirmingReturn(false)}
+        isPending={giveBack.isPending}
+      />
 
       <ConfirmDialog
         open={confirmingReject}

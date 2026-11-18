@@ -36,3 +36,8 @@ export function approveLoan(loanId: string) {
 export function rejectLoan(loanId: string) {
   return unwrap<Loan>(api.put(`/admin/loans/${loanId}/reject`));
 }
+
+// The item is physically back at the lab: puts the unit back on the shelf.
+export function returnLoan(loanId: string) {
+  return unwrap<Loan>(api.put(`/admin/loans/${loanId}/return`));
+}

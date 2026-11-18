@@ -11,7 +11,7 @@ import { AdminLoanCard } from "./AdminLoanCard";
 const VIEWS = {
   pending: { label: "Waiting", empty: "No requests waiting for a decision." },
   active: { label: "On loan", empty: "Nothing is out on loan right now." },
-  history: { label: "History", empty: "No returned or rejected loans yet." },
+  history: { label: "History", empty: "No returned, rejected or withdrawn loans yet." },
   all: { label: "All", empty: "No loan requests yet." },
 } as const;
 type View = keyof typeof VIEWS;
@@ -31,7 +31,7 @@ function loansFor(view: View, loans: Loan[]): Loan[] {
         .filter((loan) => loan.status === "APPROVED")
         .sort((a, b) => Number(isOverdue(b)) - Number(isOverdue(a)));
     case "history":
-      return loans.filter((loan) => loan.status === "RETURNED" || loan.status === "REJECTED");
+      return loans.filter((loan) => loan.status !== "PENDING" && loan.status !== "APPROVED");
     case "all":
       return loans;
   }
@@ -40,7 +40,7 @@ function loansFor(view: View, loans: Loan[]): Loan[] {
 export function AdminLoans() {
   const { read, setFilter } = useUrlFilters();
   const view = read("view", isView) ?? "pending";
-  const { loans, isPending, isError, isFetching, refetch, itemNames, borrowers } = useAdminLoanList();
+  const { loans, isPending, isError, isFetching, refetch, borrowers } = useAdminLoanList();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -86,7 +86,6 @@ export function AdminLoans() {
               <li key={loan.id}>
                 <AdminLoanCard
                   loan={loan}
-                  itemName={itemNames[loan.hardware_id]}
                   borrower={borrowers.get(loan.borrower_id)}
                 />
               </li>

@@ -1,3 +1,5 @@
+import type { ArticleListParams } from "./articles";
+import type { EventListParams } from "./events";
 import type { HardwareListParams } from "./hardware";
 import type { ProjectListParams } from "./projects";
 
@@ -20,6 +22,20 @@ export const queryKeys = {
   },
   loans: {
     mine: ["loans", "mine"] as const,
+  },
+  events: {
+    all: ["events"] as const,
+    lists: ["events", "list"] as const,
+    list: (params: EventListParams) => ["events", "list", params] as const,
+    detail: (id: string) => ["events", "detail", id] as const,
+    mine: ["events", "mine"] as const,
+    participants: (id: string) => ["events", "participants", id] as const,
+  },
+  articles: {
+    all: ["articles"] as const,
+    lists: ["articles", "list"] as const,
+    list: (params: ArticleListParams) => ["articles", "list", params] as const,
+    detail: (idOrSlug: string) => ["articles", "detail", idOrSlug] as const,
   },
   admin: {
     stats: ["admin", "stats"] as const,

@@ -3,14 +3,12 @@ import EmptyState from "../../components/EmptyState";
 import ErrorState from "../../components/ErrorState";
 import PrefetchLink from "../../components/PrefetchLink";
 import Skeleton from "../../components/Skeleton";
-import { useHardwareNames } from "../../hooks/useHardwareNames";
 import { useMyLoans } from "../../hooks/useMyLoans";
 import type { Loan } from "../../types/hardware";
 import { LoanCard } from "./LoanCard";
 
 export function MyLoans() {
   const { data: loans, isPending, isError, isFetching, refetch } = useMyLoans();
-  const names = useHardwareNames((loans ?? []).map((loan) => loan.hardware_id));
 
   if (isPending) {
     return (
@@ -25,13 +23,13 @@ export function MyLoans() {
 
   // Loans still in progress first; finished ones below as history.
   const current = loans.filter((loan) => loan.status === "PENDING" || loan.status === "APPROVED");
-  const history = loans.filter((loan) => loan.status === "RETURNED" || loan.status === "REJECTED");
+  const history = loans.filter((loan) => loan.status !== "PENDING" && loan.status !== "APPROVED");
 
   const renderList = (items: Loan[]) => (
     <ul className="space-y-4">
       {items.map((loan) => (
         <li key={loan.id}>
-          <LoanCard loan={loan} hardwareName={names[loan.hardware_id]} />
+          <LoanCard loan={loan} />
         </li>
       ))}
     </ul>

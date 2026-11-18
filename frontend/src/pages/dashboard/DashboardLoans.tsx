@@ -4,7 +4,6 @@ import Card from "../../components/Card";
 import ErrorState from "../../components/ErrorState";
 import PrefetchLink from "../../components/PrefetchLink";
 import Skeleton from "../../components/Skeleton";
-import { useHardwareNames } from "../../hooks/useHardwareNames";
 import { useMyLoans } from "../../hooks/useMyLoans";
 import { LOAN_STATUS_LABELS, LOAN_STATUS_TONES } from "../../utils/hardwareLabels";
 import { isOverdue } from "../../utils/isOverdue";
@@ -16,7 +15,6 @@ export function DashboardLoans() {
   const current = (loans ?? [])
     .filter((loan) => loan.status === "PENDING" || loan.status === "APPROVED")
     .sort((a, b) => Number(isOverdue(b)) - Number(isOverdue(a)));
-  const names = useHardwareNames(current.map((loan) => loan.hardware_id));
 
   return (
     <section aria-labelledby="dashboard-loans-heading" className="space-y-4">
@@ -46,7 +44,7 @@ export function DashboardLoans() {
               <li key={loan.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
                 <div className="min-w-0">
                   <p className="font-medium wrap-anywhere text-white">
-                    {names[loan.hardware_id] ?? <span className="text-white/40">Loading item…</span>}
+                    {loan.hardware_name ?? "Unknown item"}
                   </p>
                   <p className="text-xs text-white/50">{loanDateSummary(loan)}</p>
                 </div>

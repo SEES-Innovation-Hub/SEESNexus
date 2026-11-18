@@ -55,7 +55,8 @@ export function listMyLoans() {
   return unwrap<Loan[]>(api.get("/hardware/loans/my"));
 }
 
-// Not used on purpose: PUT /hardware/loans/:id/return lets the BORROWER mark a
-// loan returned, so a student could "return" an item they still have. Returns
-// are to be confirmed by an admin who has the item in hand, once the backend
-// adds that endpoint (DECISIONS open item 20).
+// Signed in, own loans only. Withdraws a request that is still PENDING; once
+// approved the item is out, and only an admin can check it back in.
+export function cancelLoanRequest(loanId: string) {
+  return unwrap<Loan>(api.put(`/hardware/loans/${loanId}/cancel`));
+}

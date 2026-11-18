@@ -15,7 +15,7 @@ const PREVIEW_SIZE = 3;
 export function AdminOverview() {
   const { user } = useAuth();
   const stats = useAdminStats();
-  const { loans, itemNames, borrowers } = useAdminLoanList();
+  const { loans, borrowers } = useAdminLoanList();
   const waiting = waitingQueue(loans ?? []).slice(0, PREVIEW_SIZE);
 
   return (
@@ -26,15 +26,15 @@ export function AdminOverview() {
       </div>
 
       {stats.isPending && (
-        <div aria-busy="true" aria-label="Loading figures" className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
+        <div aria-busy="true" aria-label="Loading figures" className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, index) => (
             <Skeleton key={index} className="h-28 rounded-2xl" />
           ))}
         </div>
       )}
       {stats.isError && <ErrorState onRetry={() => void stats.refetch()} isRetrying={stats.isFetching} />}
       {stats.data && (
-        <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <li>
             <StatTile label="Requests waiting" value={stats.data.pending_loans} to="/admin/loans" detail="Need a decision" />
           </li>
@@ -55,6 +55,12 @@ export function AdminOverview() {
           </li>
           <li>
             <StatTile label="Projects" value={stats.data.total_projects} to="/projects" detail="Showcased by members" />
+          </li>
+          <li>
+            <StatTile label="Events" value={stats.data.total_events} to="/events?view=all" detail="Not counting deleted ones" />
+          </li>
+          <li>
+            <StatTile label="Articles" value={stats.data.total_articles} to="/articles" detail="Drafts included" />
           </li>
         </ul>
       )}
@@ -77,7 +83,7 @@ export function AdminOverview() {
         <ul className="space-y-4">
           {waiting.map((loan) => (
             <li key={loan.id}>
-              <AdminLoanCard loan={loan} itemName={itemNames[loan.hardware_id]} borrower={borrowers.get(loan.borrower_id)} />
+              <AdminLoanCard loan={loan} borrower={borrowers.get(loan.borrower_id)} />
             </li>
           ))}
         </ul>

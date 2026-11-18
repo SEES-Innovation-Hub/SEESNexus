@@ -24,6 +24,7 @@ export const LOAN_STATUS_LABELS: Record<LoanStatus, string> = {
   APPROVED: "On loan",
   RETURNED: "Returned",
   REJECTED: "Rejected",
+  CANCELLED: "Withdrawn",
 };
 
 export const LOAN_STATUS_TONES: Record<LoanStatus, BadgeTone> = {
@@ -31,6 +32,7 @@ export const LOAN_STATUS_TONES: Record<LoanStatus, BadgeTone> = {
   APPROVED: "mint",
   RETURNED: "neutral",
   REJECTED: "red",
+  CANCELLED: "neutral",
 };
 
 export const HARDWARE_CATEGORY_OPTIONS = Object.entries(HARDWARE_CATEGORY_LABELS).map(
