@@ -75,8 +75,11 @@ class EventResponse(BaseModel):
     # entitled to it. They default rather than being required so that
     # model_validate() can still read an Event ORM instance directly.
     confirmed_count: int = 0
-    # Confirmed students an admin has checked in.
+    # Confirmed students checked in (by an admin, or themselves with the code).
     attended_count: int = 0
+    # Whether self check-in is open. The code itself is admins-only.
+    checkin_open: bool = False
+    checkin_code: str | None = None
     # None means unlimited, matching max_participants (Tech Doc §4.2).
     spots_left: int | None = None
 
@@ -90,6 +93,10 @@ class EventRegistrationResponse(BaseModel):
     status: RegistrationStatus
     registered_at: datetime
     attended_at: datetime | None = None
+
+
+class CheckInRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=12)
 
 
 class AttendanceUpdate(BaseModel):

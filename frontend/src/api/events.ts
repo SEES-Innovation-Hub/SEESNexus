@@ -81,6 +81,21 @@ export function listParticipants(id: string) {
   return unwrap<Participant[]>(api.get(`/events/${id}/participants`));
 }
 
+// A confirmed member checks themselves in with the code shown at the event,
+// from an hour before the start until the end.
+export function checkIn(eventId: string, code: string) {
+  return unwrap<Registration>(api.post(`/events/${eventId}/checkin`, { code }));
+}
+
+// Admin: open self check-in, or replace the code.
+export function openCheckIn(eventId: string) {
+  return unwrap<SeesEvent>(api.post(`/events/${eventId}/checkin-code`));
+}
+
+export function closeCheckIn(eventId: string) {
+  return unwrap<SeesEvent>(api.delete(`/events/${eventId}/checkin-code`));
+}
+
 // Only a CONFIRMED registration can be marked.
 export function setAttendance(eventId: string, registrationId: string, attended: boolean) {
   return unwrap<Registration>(

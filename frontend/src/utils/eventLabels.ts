@@ -49,6 +49,16 @@ export function hasStarted(event: Pick<SeesEvent, "start_date">, now = Date.now(
   return new Date(event.start_date).getTime() <= now;
 }
 
+// Members can check in from an hour before the start until the end (the
+// backend applies the same window).
+const CHECKIN_OPENS_BEFORE_MS = 60 * 60 * 1000;
+export function inCheckInWindow(event: Pick<SeesEvent, "start_date" | "end_date">, now = Date.now()): boolean {
+  return (
+    now >= new Date(event.start_date).getTime() - CHECKIN_OPENS_BEFORE_MS &&
+    now <= new Date(event.end_date).getTime()
+  );
+}
+
 export function registrationClosed(event: Pick<SeesEvent, "registration_deadline">, now = Date.now()): boolean {
   return new Date(event.registration_deadline).getTime() < now;
 }

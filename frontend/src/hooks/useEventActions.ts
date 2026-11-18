@@ -1,6 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   cancelRegistration,
+  checkIn,
+  closeCheckIn,
+  openCheckIn,
   createEvent,
   deleteEvent,
   registerForEvent,
@@ -44,3 +47,8 @@ export const useSetAttendance = () =>
     ({ eventId, registrationId, attended }: { eventId: string; registrationId: string; attended: boolean }) =>
       setAttendance(eventId, registrationId, attended),
   );
+
+export const useCheckIn = () =>
+  useEventMutation(({ eventId, code }: { eventId: string; code: string }) => checkIn(eventId, code));
+export const useOpenCheckIn = () => useEventMutation(openCheckIn);
+export const useCloseCheckIn = () => useEventMutation(closeCheckIn);

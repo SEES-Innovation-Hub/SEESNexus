@@ -19,6 +19,7 @@ import {
   eventWhen,
   formatDateTime,
 } from "../../utils/eventLabels";
+import { CheckInPanel } from "./CheckInPanel";
 import { EventNotFound } from "./EventNotFound";
 
 // Organiser labels: the member-facing ones ("You're going") read oddly here.
@@ -131,6 +132,8 @@ export function EventParticipants() {
           <StatTile label="Cancelled" value={cancelled.length} />
         </li>
       </ul>
+
+      {!event.data.deleted_at && <CheckInPanel event={event.data} />}
 
       {rows.length === 0 ? (
         <EmptyState title="Nobody has registered yet" message="Registrations will appear here as they come in." />

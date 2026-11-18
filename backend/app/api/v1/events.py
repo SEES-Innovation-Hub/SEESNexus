@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -13,6 +14,7 @@ from app.models.user import User, UserRole
 from app.schemas.envelope import success
 from app.schemas.events import (
     AttendanceUpdate,
+    CheckInRequest,
     EventCreate,
     EventParticipantResponse,
     EventRegistrationResponse,
@@ -73,6 +75,10 @@ def _event_response(event: Event, viewer: User) -> EventResponse:
             "virtual_link": (
                 event.virtual_link if _may_see_virtual_link(event, viewer) else None
             ),
+            "checkin_open": event.checkin_code is not None,
+            # The code is what proves someone was in the room; a member who
+            # could read it from the API could check in from home.
+            "checkin_code": event.checkin_code if viewer.role == UserRole.ADMIN else None,
         }
     )
 
@@ -591,4 +597,97 @@ async def mark_attendance(
     return success(
         data=EventRegistrationResponse.model_validate(registration).model_dump(mode="json"),
         message="Attendance recorded" if payload.attended else "Attendance cleared",
+    )
+
+
+# --- self check-in ---------------------------------------------------------
+
+# No 0/O, 1/I/L: the code is read off a projector and typed on a phone.
+CHECKIN_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+CHECKIN_CODE_LENGTH = 6
+# Members may check in from this long before the start until the event ends.
+CHECKIN_OPENS_BEFORE = timedelta(hours=1)
+
+
+def _new_checkin_code() -> str:
+    return "".join(secrets.choice(CHECKIN_ALPHABET) for _ in range(CHECKIN_CODE_LENGTH))
+
+
+@router.post("/{event_id}/checkin-code")
+async def open_checkin(
+    event_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Open self check-in, or replace the code (e.g. if it was shared outside the room)."""
+    event = await _get_event_or_404(db, event_id)
+    event.checkin_code = _new_checkin_code()
+    await db.commit()
+    await db.refresh(event)
+    return success(data=_serialize_event(event, admin), message="Check-in is open")
+
+
+@router.delete("/{event_id}/checkin-code")
+async def close_checkin(
+    event_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await _get_event_or_404(db, event_id)
+    event.checkin_code = None
+    await db.commit()
+    await db.refresh(event)
+    return success(data=_serialize_event(event, admin), message="Check-in is closed")
+
+
+@router.post("/{event_id}/checkin")
+async def check_in(
+    event_id: str,
+    payload: CheckInRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """A confirmed member marks themselves attended with the code shown at the event."""
+    event = await _get_event_or_404(db, event_id)
+    registration = (
+        await db.execute(
+            select(EventRegistration).where(
+                EventRegistration.event_id == event.id,
+                EventRegistration.student_id == current_user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if registration is None or registration.status != RegistrationStatus.CONFIRMED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only members with a confirmed place can check in",
+        )
+    if registration.attended_at is not None:
+        # Idempotent: a double tap or a retry is not an error.
+        return success(
+            data=EventRegistrationResponse.model_validate(registration).model_dump(mode="json"),
+            message="You're already checked in",
+        )
+
+    now = datetime.now(timezone.utc)
+    if now < _as_utc(event.start_date) - CHECKIN_OPENS_BEFORE or now > _as_utc(event.end_date):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Check-in is only possible from an hour before the event until it ends",
+        )
+    if event.checkin_code is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Check-in hasn't been opened for this event yet",
+        )
+    typed = payload.code.strip().upper()
+    if not secrets.compare_digest(typed.encode(), event.checkin_code.encode()):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That code isn't right")
+
+    registration.attended_at = now
+    await db.commit()
+    await db.refresh(registration)
+    return success(
+        data=EventRegistrationResponse.model_validate(registration).model_dump(mode="json"),
+        message="You're checked in",
     )

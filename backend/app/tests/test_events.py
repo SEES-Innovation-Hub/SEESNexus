@@ -806,3 +806,112 @@ async def test_a_failed_promotion_email_does_not_fail_the_cancel(
     )
     assert response.status_code == 200
     assert (await my_registrations(client, other_student_token))[0]["status"] == "CONFIRMED"
+
+
+# --- self check-in ---
+
+
+async def _make_it_running_now(db_session, event_id: str) -> None:
+    row = (await db_session.execute(select(Event).where(Event.id == event_id))).scalar_one()
+    now = datetime.now(timezone.utc)
+    row.registration_deadline = now - timedelta(hours=1)
+    row.start_date = now - timedelta(minutes=30)
+    row.end_date = now + timedelta(hours=2)
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_member_checks_in_with_the_code(
+    client: AsyncClient, db_session, admin_token: str, student_token: str
+):
+    event = await create_event(client, admin_token)
+    await register(client, event["id"], student_token)
+    await _make_it_running_now(db_session, event["id"])
+
+    # Not open yet.
+    early = await client.post(
+        f"{BASE}/{event['id']}/checkin", json={"code": "ABCDEF"}, headers=auth_header(student_token)
+    )
+    assert early.status_code == 400
+    assert "hasn't been opened" in early.json()["message"]
+
+    opened = await client.post(f"{BASE}/{event['id']}/checkin-code", headers=auth_header(admin_token))
+    code = opened.json()["data"]["checkin_code"]
+    assert len(code) == 6 and opened.json()["data"]["checkin_open"] is True
+
+    # Members learn that check-in is open, never the code.
+    seen = await client.get(f"{BASE}/{event['id']}", headers=auth_header(student_token))
+    assert seen.json()["data"]["checkin_open"] is True
+    assert seen.json()["data"]["checkin_code"] is None
+
+    wrong = await client.post(
+        f"{BASE}/{event['id']}/checkin", json={"code": "ZZZZZZ"}, headers=auth_header(student_token)
+    )
+    assert wrong.status_code == 400
+
+    # Case and spaces don't matter.
+    ok = await client.post(
+        f"{BASE}/{event['id']}/checkin",
+        json={"code": f" {code.lower()} "},
+        headers=auth_header(student_token),
+    )
+    assert ok.status_code == 200
+    assert ok.json()["data"]["attended_at"] is not None
+
+    again = await client.post(
+        f"{BASE}/{event['id']}/checkin", json={"code": "whatever"}, headers=auth_header(student_token)
+    )
+    assert again.status_code == 200
+    assert again.json()["message"] == "You're already checked in"
+
+
+@pytest.mark.asyncio
+async def test_check_in_rules(
+    client: AsyncClient,
+    db_session,
+    admin_token: str,
+    student_token: str,
+    other_student_token: str,
+    third_student_token: str,
+):
+    event = await create_event(client, admin_token, max_participants=1)
+    await register(client, event["id"], student_token)
+    await register(client, event["id"], other_student_token)  # waitlisted
+    code = (
+        await client.post(f"{BASE}/{event['id']}/checkin-code", headers=auth_header(admin_token))
+    ).json()["data"]["checkin_code"]
+
+    # Too early: the event is days away.
+    too_early = await client.post(
+        f"{BASE}/{event['id']}/checkin", json={"code": code}, headers=auth_header(student_token)
+    )
+    assert too_early.status_code == 400
+    assert "an hour before" in too_early.json()["message"]
+
+    await _make_it_running_now(db_session, event["id"])
+    for token in (other_student_token, third_student_token):  # waitlisted, unregistered
+        denied = await client.post(
+            f"{BASE}/{event['id']}/checkin", json={"code": code}, headers=auth_header(token)
+        )
+        assert denied.status_code == 403
+
+    # Students can't open or close check-in.
+    assert (
+        await client.post(f"{BASE}/{event['id']}/checkin-code", headers=auth_header(student_token))
+    ).status_code == 403
+
+    # A new code replaces the old one; closing stops check-in.
+    new_code = (
+        await client.post(f"{BASE}/{event['id']}/checkin-code", headers=auth_header(admin_token))
+    ).json()["data"]["checkin_code"]
+    if new_code != code:
+        stale = await client.post(
+            f"{BASE}/{event['id']}/checkin", json={"code": code}, headers=auth_header(student_token)
+        )
+        assert stale.status_code == 400
+    closed = await client.delete(f"{BASE}/{event['id']}/checkin-code", headers=auth_header(admin_token))
+    assert closed.json()["data"]["checkin_open"] is False
+    after_close = await client.post(
+        f"{BASE}/{event['id']}/checkin", json={"code": new_code}, headers=auth_header(student_token)
+    )
+    assert after_close.status_code == 400

@@ -14,9 +14,11 @@ import {
   REGISTRATION_STATUS_TONES,
   formatDateTime,
   hasStarted,
+  inCheckInWindow,
   registrationClosed,
 } from "../../utils/eventLabels";
 import { isHttpUrl } from "../../utils/isHttpUrl";
+import { CheckInForm } from "./CheckInForm";
 
 // The member's side of an event: where they stand and what they can do next.
 export function RegistrationPanel({ event }: { event: SeesEvent }) {
@@ -72,6 +74,11 @@ export function RegistrationPanel({ event }: { event: SeesEvent }) {
               </span>
             )}
           </div>
+
+          {registration.status === "CONFIRMED" &&
+            !registration.attended_at &&
+            event.checkin_open &&
+            inCheckInWindow(event) && <CheckInForm eventId={event.id} />}
 
           <div className="flex flex-wrap gap-3">
             {registration.status === "CONFIRMED" && event.is_virtual && isHttpUrl(event.virtual_link) && (

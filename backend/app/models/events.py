@@ -41,6 +41,9 @@ class Event(Base):
     created_by_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set by an admin to open self check-in; confirmed members type it in at the
+    # event. Null = check-in closed. Only ever sent to admins.
+    checkin_code: Mapped[str | None] = mapped_column(String(12), nullable=True)
 
     registrations: Mapped[list["EventRegistration"]] = relationship(
         back_populates="event", lazy="selectin", cascade="save-update, merge"

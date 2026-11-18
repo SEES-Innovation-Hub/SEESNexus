@@ -24,6 +24,9 @@ export interface SeesEvent {
   deleted_at: string | null;
   confirmed_count: number;
   attended_count: number;
+  // Self check-in is open. The code itself is only sent to admins.
+  checkin_open: boolean;
+  checkin_code: string | null;
   // null when there is no limit.
   spots_left: number | null;
 }
