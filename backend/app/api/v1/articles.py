@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_roles
 from app.core.pagination import MAX_PAGE_SIZE, paginate, total_pages
+from app.core.search import contains_pattern
 from app.models.article import Article, ArticleStatus
 from app.models.user import User, UserRole
 from app.schemas.article import (
@@ -133,7 +134,7 @@ async def list_articles(
     if status_filter is not None:
         stmt = stmt.where(Article.status == status_filter)
     if search:
-        stmt = stmt.where(Article.title.ilike(f"%{search}%"))
+        stmt = stmt.where(Article.title.ilike(contains_pattern(search), escape="\\"))
 
     # Newest first. Drafts have no published_at, so they fall back to created_at.
     stmt = stmt.order_by(Article.published_at.desc().nulls_last(), Article.created_at.desc())

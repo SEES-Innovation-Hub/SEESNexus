@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.search import contains_pattern
 from app.models.user import User
 from app.schemas.auth import UserSearchResult
 from app.schemas.envelope import success
@@ -31,7 +32,7 @@ async def search_users(
 
     result = await db.execute(
         select(User)
-        .where(User.is_active.is_(True), User.full_name.ilike(f"%{needle}%"))
+        .where(User.is_active.is_(True), User.full_name.ilike(contains_pattern(needle), escape="\\"))
         .order_by(User.full_name.asc())
         .limit(SEARCH_RESULT_LIMIT)
     )

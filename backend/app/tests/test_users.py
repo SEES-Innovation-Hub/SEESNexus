@@ -111,3 +111,9 @@ async def test_search_rejects_empty_query(client: AsyncClient, student_token: st
         f"{BASE}/search", params={"q": ""}, headers=auth_header(student_token)
     )
     assert resp.status_code == 422
+
+
+async def test_search_treats_wildcards_literally(client: AsyncClient, student_token: str):
+    resp = await client.get(f"{BASE}/search", params={"q": "%"}, headers=auth_header(student_token))
+    assert resp.status_code == 200
+    assert resp.json()["data"] == []

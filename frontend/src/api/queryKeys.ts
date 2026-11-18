@@ -36,6 +36,9 @@ export const queryKeys = {
     list: (params: ArticleListParams) => ["articles", "list", params] as const,
     detail: (idOrSlug: string) => ["articles", "detail", idOrSlug] as const,
   },
+  users: {
+    search: (q: string) => ["users", "search", q] as const,
+  },
   admin: {
     stats: ["admin", "stats"] as const,
     users: ["admin", "users"] as const,

@@ -12,10 +12,13 @@ import {
   type ProjectFormErrors,
   type ProjectFormValues,
 } from "./projectFormValues";
+import { TeamPicker } from "./TeamPicker";
 import { TechStackInput } from "./TechStackInput";
 
 interface ProjectFormProps {
   initialValues: ProjectFormValues;
+  // The creator's id: they stay on the team.
+  creatorId: string;
   submitLabel: string;
   isSubmitting: boolean;
   // The server's answer when saving failed (e.g. "You do not have permission…").
@@ -28,6 +31,7 @@ interface ProjectFormProps {
 // decides what Save does (create or update) and where to go afterwards.
 export function ProjectForm({
   initialValues,
+  creatorId,
   submitLabel,
   isSubmitting,
   serverError,
@@ -96,6 +100,7 @@ export function ProjectForm({
         />
       </div>
       <TechStackInput value={values.techStack} onChange={(value) => update("techStack", value)} />
+      <TeamPicker value={values.members} onChange={(value) => update("members", value)} lockedId={creatorId} />
       <div className="grid gap-5 sm:grid-cols-2">
         <TextField
           id="project-githubUrl"

@@ -60,11 +60,11 @@ export function EditProject() {
       <Card padding="lg">
         <ProjectForm
           initialValues={toFormValues(project)}
+          creatorId={project.created_by_id}
           submitLabel="Save changes"
           isSubmitting={updateProject.isPending}
           serverError={updateProject.error && errorMessage(updateProject.error, "Couldn't save the changes. Try again.")}
           onSubmit={(payload) =>
-            // member_ids is left out, so the backend keeps the current team.
             updateProject.mutate(
               { id, payload },
               {

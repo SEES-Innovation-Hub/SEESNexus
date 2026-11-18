@@ -1,4 +1,4 @@
-import type { Project, ProjectCategory, ProjectPayload, ProjectStatus } from "../../types/project";
+import type { Project, ProjectCategory, ProjectMember, ProjectPayload, ProjectStatus } from "../../types/project";
 import { isHttpUrl } from "../../utils/isHttpUrl";
 
 // What the form edits: text inputs hold strings, so empty links are "" here and
@@ -11,6 +11,8 @@ export interface ProjectFormValues {
   techStack: string[];
   githubUrl: string;
   demoUrl: string;
+  // The whole team; sent as member_ids, which replaces the team on save.
+  members: ProjectMember[];
 }
 
 export type ProjectFormErrors = Partial<Record<keyof ProjectFormValues, string>>;
@@ -29,6 +31,7 @@ export const EMPTY_VALUES: ProjectFormValues = {
   techStack: [],
   githubUrl: "",
   demoUrl: "",
+  members: [],
 };
 
 export function toFormValues(project: Project): ProjectFormValues {
@@ -40,6 +43,7 @@ export function toFormValues(project: Project): ProjectFormValues {
     techStack: project.tech_stack,
     githubUrl: project.github_url ?? "",
     demoUrl: project.demo_url ?? "",
+    members: project.members,
   };
 }
 
@@ -73,5 +77,6 @@ export function toPayload(values: ProjectFormValues): ProjectPayload {
     tech_stack: values.techStack,
     github_url: values.githubUrl.trim() || null,
     demo_url: values.demoUrl.trim() || null,
+    member_ids: values.members.map((member) => member.id),
   };
 }

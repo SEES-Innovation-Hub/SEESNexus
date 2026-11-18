@@ -221,18 +221,34 @@ async def test_update_replaces_members_rather_than_appending(
     client: AsyncClient, student_token: str, student_user: User, admin_user: User
 ):
     created = await client.post(
-        BASE, json=payload(member_ids=[student_user.id]), headers=auth_header(student_token)
+        BASE, json=payload(member_ids=[student_user.id, admin_user.id]), headers=auth_header(student_token)
     )
     project_id = created.json()["data"]["id"]
 
+    # Dropping the admin from the list removes them: the list replaces the team.
     resp = await client.put(
-        f"{BASE}/{project_id}",
-        json={"member_ids": [admin_user.id]},
-        headers=auth_header(student_token),
+        f"{BASE}/{project_id}", json={"member_ids": []}, headers=auth_header(student_token)
     )
     assert resp.status_code == 200
     member_ids = [m["id"] for m in resp.json()["data"]["members"]]
-    assert member_ids == [admin_user.id]
+    # The creator always stays on their own project.
+    assert member_ids == [student_user.id]
+
+
+async def test_creator_is_always_on_the_team(
+    client: AsyncClient, student_token: str, student_user: User, admin_user: User, admin_token: str
+):
+    created = await client.post(
+        BASE, json=payload(member_ids=[admin_user.id]), headers=auth_header(student_token)
+    )
+    project_id = created.json()["data"]["id"]
+    assert {m["id"] for m in created.json()["data"]["members"]} == {student_user.id, admin_user.id}
+
+    # Not even an admin's edit can take the creator off.
+    resp = await client.put(
+        f"{BASE}/{project_id}", json={"member_ids": [admin_user.id]}, headers=auth_header(admin_token)
+    )
+    assert {m["id"] for m in resp.json()["data"]["members"]} == {student_user.id, admin_user.id}
 
 
 async def test_update_unknown_member_id_400(

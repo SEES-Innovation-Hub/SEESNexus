@@ -38,6 +38,16 @@ async def _get_project_or_404(db: AsyncSession, project_id: str) -> Project:
     return project
 
 
+async def _team_with_creator(db: AsyncSession, member_ids: list[str], creator_id: str) -> list[User]:
+    """The team as sent, with the creator always on it (listed first).
+
+    member_ids replaces the whole team, so without this an edit -- including
+    an admin's -- could quietly take the creator off their own project.
+    """
+    ids = [creator_id, *(member_id for member_id in member_ids if member_id != creator_id)]
+    return await _resolve_members(db, ids)
+
+
 async def _resolve_members(db: AsyncSession, member_ids: list[str]) -> list[User]:
     """Map member ids to users, rejecting unknown ones with 400.
 
@@ -102,7 +112,7 @@ async def create_project(
     db: AsyncSession = Depends(get_db),
 ):
     """Any authenticated user may create a project — no role gate."""
-    members = await _resolve_members(db, payload.member_ids)
+    members = await _team_with_creator(db, payload.member_ids, current_user.id)
 
     project = Project(
         title=payload.title,
@@ -152,7 +162,7 @@ async def update_project(
 
     if member_ids is not None:
         # member_ids replaces the full set; there are no add/remove sub-routes.
-        project.members = await _resolve_members(db, member_ids)
+        project.members = await _team_with_creator(db, member_ids, project.created_by_id)
 
     await db.commit()
     await db.refresh(project)

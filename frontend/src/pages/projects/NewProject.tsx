@@ -24,15 +24,18 @@ export function NewProject() {
       </div>
       <Card padding="lg">
         <ProjectForm
-          initialValues={EMPTY_VALUES}
+          // The creator starts on the team and stays there.
+          initialValues={{
+            ...EMPTY_VALUES,
+            members: [{ id: user.id, full_name: user.full_name, profile_image_url: user.profile_image_url }],
+          }}
+          creatorId={user.id}
           submitLabel="Create project"
           isSubmitting={createProject.isPending}
           serverError={createProject.error && errorMessage(createProject.error, "Couldn't create the project. Try again.")}
           onSubmit={(payload) =>
-            // The creator is listed as the first team member. Picking other
-            // members needs a user search endpoint the backend doesn't have yet.
             createProject.mutate(
-              { ...payload, member_ids: [user.id] },
+              payload,
               {
                 onSuccess: (project) => {
                   showToast("Project created");
