@@ -295,7 +295,7 @@ async def test_admin_signup_is_off_without_a_configured_key(client: AsyncClient,
     monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", "")
     resp = await _register_new_user(client, email="x@unilag.edu.ng", admin_key="anything-at-all")
     assert resp.status_code == 403
-    assert resp.json()["message"] == "Admin sign-up is not enabled on this server"
+    assert "no admin key is configured" in resp.json()["message"]
 
 
 async def test_blank_admin_key_is_an_ordinary_student_signup(client: AsyncClient, monkeypatch):

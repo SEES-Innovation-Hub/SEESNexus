@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.admin_key import assert_admin_key
 from app.core.database import get_db
 from app.core.deps import require_admin
 from app.models.article import Article
@@ -73,6 +74,9 @@ async def change_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot change your own role",
         )
+
+    if payload.role == UserRole.ADMIN and user.role != UserRole.ADMIN:
+        assert_admin_key(payload.admin_key)
 
     user.role = payload.role
     await db.commit()

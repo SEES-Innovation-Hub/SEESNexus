@@ -89,6 +89,52 @@ async def test_change_role_happy_path(client: AsyncClient, admin_token: str, stu
     assert resp.json()["data"]["role"] == "CONTRIBUTOR"
 
 
+async def test_promoting_to_admin_needs_the_admin_key(
+    client: AsyncClient, admin_token: str, student_user, monkeypatch
+):
+    from app.core.config import settings
+
+    key = "promotion-key-0123456789abcdef"
+    monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", key)
+    url = f"/api/v1/admin/users/{student_user.id}/role"
+
+    without = await client.put(url, json={"role": "ADMIN"}, headers=auth_header(admin_token))
+    assert without.status_code == 403
+    assert without.json()["message"] == "Invalid admin key"
+
+    wrong = await client.put(
+        url, json={"role": "ADMIN", "admin_key": "nope"}, headers=auth_header(admin_token)
+    )
+    assert wrong.status_code == 403
+
+    users = await client.get("/api/v1/admin/users", headers=auth_header(admin_token))
+    assert next(u for u in users.json()["data"] if u["id"] == student_user.id)["role"] == "STUDENT"
+
+    right = await client.put(
+        url, json={"role": "ADMIN", "admin_key": key}, headers=auth_header(admin_token)
+    )
+    assert right.status_code == 200
+    assert right.json()["data"]["role"] == "ADMIN"
+
+    # Demoting never needs the key.
+    down = await client.put(url, json={"role": "STUDENT"}, headers=auth_header(admin_token))
+    assert down.status_code == 200
+
+
+async def test_no_promotion_to_admin_when_no_key_is_configured(
+    client: AsyncClient, admin_token: str, student_user, monkeypatch
+):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", "")
+    resp = await client.put(
+        f"/api/v1/admin/users/{student_user.id}/role",
+        json={"role": "ADMIN", "admin_key": "anything"},
+        headers=auth_header(admin_token),
+    )
+    assert resp.status_code == 403
+
+
 async def test_change_role_404_for_unknown_user(client: AsyncClient, admin_token: str):
     resp = await client.put(
         "/api/v1/admin/users/does-not-exist/role",

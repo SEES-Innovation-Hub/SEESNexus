@@ -7,7 +7,8 @@ import type { UserRole } from "../types/auth";
 export function useChangeUserRole() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: UserRole }) => changeUserRole(userId, role),
+    mutationFn: ({ userId, role, adminKey }: { userId: string; role: UserRole; adminKey?: string }) =>
+      changeUserRole(userId, role, adminKey),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.users });
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });

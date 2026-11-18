@@ -6,38 +6,62 @@ import Button from "../../components/Button";
 import Card from "../../components/Card";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import Select from "../../components/Select";
+import TextField from "../../components/TextField";
 import { useChangeUserRole } from "../../hooks/useChangeUserRole";
-import { useDeactivateUser } from "../../hooks/useDeactivateUser";
+import { useActivateUser, useDeactivateUser } from "../../hooks/useDeactivateUser";
 import { useToast } from "../../hooks/useToast";
 import type { User, UserRole } from "../../types/auth";
 import { ROLE_LABELS, ROLE_OPTIONS } from "../../utils/userLabels";
 
 interface UserRowProps {
   member: User;
-  // The signed-in admin's own row: no controls, so they can't demote or
-  // deactivate themselves (the backend doesn't stop that yet).
+  // The signed-in admin's own row: no controls (the backend refuses changing
+  // your own role or deactivating yourself anyway).
   isSelf: boolean;
 }
 
 export function UserRow({ member, isSelf }: UserRowProps) {
   const changeRole = useChangeUserRole();
   const deactivate = useDeactivateUser();
+  const activate = useActivateUser();
+  // Promoting to Admin needs the admin key, typed into the confirmation dialog.
+  const [adminKey, setAdminKey] = useState("");
   const { showToast } = useToast();
   // The role picked in the dropdown, waiting for confirmation.
   const [pendingRole, setPendingRole] = useState<UserRole | null>(null);
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const canManage = !isSelf && member.is_active;
 
+  function closeRoleDialog() {
+    setPendingRole(null);
+    setAdminKey("");
+  }
+
   function confirmRole() {
     if (!pendingRole) return;
+    const toAdmin = pendingRole === "ADMIN";
+    if (toAdmin && !adminKey.trim()) {
+      showToast("Enter the admin key to make someone an admin.", "error");
+      return;
+    }
     changeRole.mutate(
-      { userId: member.id, role: pendingRole },
+      { userId: member.id, role: pendingRole, adminKey: toAdmin ? adminKey.trim() : undefined },
       {
-        onSuccess: () => showToast(`${member.full_name}'s role is now ${ROLE_LABELS[pendingRole]}.`),
+        onSuccess: () => {
+          showToast(`${member.full_name}'s role is now ${ROLE_LABELS[pendingRole]}.`);
+          closeRoleDialog();
+        },
+        // A wrong key keeps the dialog open so it can be retyped.
         onError: (error) => showToast(errorMessage(error, "Couldn't change the role. Try again."), "error"),
-        onSettled: () => setPendingRole(null),
       },
     );
+  }
+
+  function confirmActivate() {
+    activate.mutate(member.id, {
+      onSuccess: () => showToast(`${member.full_name} can log in again.`),
+      onError: (error) => showToast(errorMessage(error, "Couldn't reactivate the account. Try again."), "error"),
+    });
   }
 
   function confirmDeactivate() {
@@ -81,27 +105,47 @@ export function UserRow({ member, isSelf }: UserRowProps) {
           </Button>
         </div>
       ) : (
-        <Badge>{ROLE_LABELS[member.role]}</Badge>
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge>{ROLE_LABELS[member.role]}</Badge>
+          {!isSelf && !member.is_active && (
+            <Button variant="secondary" onClick={confirmActivate} isLoading={activate.isPending}>
+              Reactivate
+            </Button>
+          )}
+        </div>
       )}
 
       <ConfirmDialog
         open={pendingRole !== null}
         title={`Change ${member.full_name}'s role to ${pendingRole ? ROLE_LABELS[pendingRole] : ""}?`}
         message={
-          pendingRole === "ADMIN"
-            ? "Admins can approve loans, manage hardware and members, and edit or delete any project."
-            : "Their access changes the next time they load a page."
+          pendingRole === "ADMIN" ? (
+            <div className="space-y-4">
+              <p>Admins can approve loans, manage hardware, events and members, and edit or delete anything.</p>
+              <TextField
+                id={`admin-key-${member.id}`}
+                label="Admin key"
+                type="password"
+                autoComplete="off"
+                value={adminKey}
+                onChange={setAdminKey}
+                hint="Nobody becomes an admin without it. Provided privately by the SEES Nexus team."
+              />
+            </div>
+          ) : (
+            "Their access changes the next time they load a page."
+          )
         }
         confirmLabel="Change role"
         tone="primary"
         onConfirm={confirmRole}
-        onCancel={() => setPendingRole(null)}
+        onCancel={closeRoleDialog}
         isPending={changeRole.isPending}
       />
       <ConfirmDialog
         open={confirmingDeactivate}
         title={`Deactivate ${member.full_name}?`}
-        message="They won't be able to log in. Their projects and loan history are kept. This can't be undone from the website yet."
+        message="They won't be able to log in. Their projects and loan history are kept, and you can reactivate them later."
         confirmLabel="Deactivate account"
         onConfirm={confirmDeactivate}
         onCancel={() => setConfirmingDeactivate(false)}

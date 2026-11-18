@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.user import UserRole
 
@@ -19,6 +19,9 @@ class DashboardStats(BaseModel):
 
 class RoleChangeRequest(BaseModel):
     role: UserRole
+    # Required when the new role is ADMIN: nobody becomes an admin without the
+    # admin key, not even when another admin promotes them.
+    admin_key: str | None = Field(default=None, max_length=256)
 
 
 # LoanPublic moved to app/schemas/hardware.py -- a loan is a hardware entity and

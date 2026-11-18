@@ -14,13 +14,18 @@ export function listUsers() {
   return unwrap<User[]>(api.get("/admin/users"));
 }
 
-export function changeUserRole(userId: string, role: UserRole) {
-  return unwrap<User>(api.put(`/admin/users/${userId}/role`, { role }));
+// Making someone an ADMIN needs the admin key (403 "Invalid admin key" otherwise).
+export function changeUserRole(userId: string, role: UserRole, adminKey?: string) {
+  return unwrap<User>(api.put(`/admin/users/${userId}/role`, { role, admin_key: adminKey }));
 }
 
-// Soft delete: the account can no longer log in. There is no undo endpoint yet.
+// Soft delete: the account can no longer log in. activateUser undoes it.
 export function deactivateUser(userId: string) {
   return unwrap<null>(api.delete(`/admin/users/${userId}`));
+}
+
+export function activateUser(userId: string) {
+  return unwrap<User>(api.put(`/admin/users/${userId}/activate`));
 }
 
 // Every loan from every member, newest request first.
