@@ -1,0 +1,13 @@
+# Store text as LF in the repository; check out with native endings is left to each
+# contributor's git config. A batch of commits once converted ~20 files to CRLF,
+# which made every later diff of them unreadable.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.glb binary
+*.woff binary
+*.woff2 binary
