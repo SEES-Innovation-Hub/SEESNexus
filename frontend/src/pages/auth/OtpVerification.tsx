@@ -62,13 +62,9 @@ export function OtpVerification({
                 : "Verify"}
           </Button>
 
-          <button
-            type="button"
-            onClick={onBack}
-            className="w-full py-3 text-sm text-sees-mustard underline hover:text-sees-mint"
-          >
+          <Button variant="secondary" onClick={onBack} className="w-full">
             Back
-          </button>
+          </Button>
         </form>
       </Card>
     </div>

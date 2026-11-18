@@ -16,13 +16,15 @@ interface ImageUploadFieldProps {
   onChange: (url: string) => void;
   hint?: string;
   error?: string;
+  // Lets the host form hold back Save while a picture uploads.
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 // Pick a picture, it uploads to Cloudinary straight away (POST /upload/image)
 // and the field holds the URL it came back with. Shows a preview; Replace and
 // Remove. "Use a link instead" takes a pasted https:// URL, which is also the
 // fallback when the server has no Cloudinary keys.
-export default function ImageUploadField({ id, label, value, onChange, hint, error }: ImageUploadFieldProps) {
+export default function ImageUploadField({ id, label, value, onChange, hint, error, onUploadingChange }: ImageUploadFieldProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [usingLink, setUsingLink] = useState(false);
@@ -46,6 +48,7 @@ export default function ImageUploadField({ id, label, value, onChange, hint, err
 
     setUploadError(null);
     setIsUploading(true);
+    onUploadingChange?.(true);
     try {
       const { url } = await uploadImage(file);
       onChange(url);
@@ -59,6 +62,7 @@ export default function ImageUploadField({ id, label, value, onChange, hint, err
       );
     } finally {
       setIsUploading(false);
+      onUploadingChange?.(false);
     }
   }
 

@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent } from "react";
 import { uploadImage } from "../../api/upload";
 import { errorMessage } from "../../api/client";
+import { buttonClassName } from "../../components/Button/buttonClassName";
 import { useAuth } from "../../hooks/useAuth";
 
 interface ProfileAvatarProps {
@@ -52,7 +53,7 @@ export function ProfileAvatar({ imageUrl, name }: ProfileAvatarProps) {
         </div>
       )}
 
-      <label className="inline-flex min-h-11 cursor-pointer items-center text-sm text-sees-mustard underline focus-within:ring-1 focus-within:ring-sees-mint hover:text-sees-mint">
+      <label className={buttonClassName("secondary", "cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sees-mint")}>
         {isUploading ? "Uploading…" : "Change photo"}
         <input
           type="file"

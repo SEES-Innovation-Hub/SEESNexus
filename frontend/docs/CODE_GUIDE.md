@@ -85,7 +85,7 @@ src/
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    Avatar/  ProtectedRoute/  GuestRoute/  RoleRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/  StatTile/
+    Avatar/  ProtectedRoute/  GuestRoute/  RoleRoute/  AdminRoute/  PrefetchLink/  BackLink/  SeeAllLink/  ImageGenerator/  ProjectCard/  StatTile/
     Checkbox/  Markdown/  ImageUploadField/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection,
@@ -104,9 +104,9 @@ src/
     admin/     AdminOverview, AdminLoans, AdminLoanCard, AdminUsers, UserRow,
                AdminHardware, AdminHardwareRow, HardwareFormModal, hardwareFormValues
     notfound/  NotFound
-    dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
+    dev/       ComponentsPreview  (temporary sandbox, dev builds only)
   utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
-               isHttpUrl, canEditProject, returnPath, isOverdue, loanDates, waitingQueue, userLabels,
+               isHttpUrl, parseApiDate, canEditProject, returnPath, isOverdue, loanDates, waitingQueue, userLabels,
                eventLabels (labels, dates, places), articleLabels (who may write/edit, dates, reading time)
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
@@ -172,7 +172,7 @@ What we get for free: one request even if two components ask for the same data, 
 The backend requires login for `GET /projects`, so Landing no longer shows projects. Members browse them at `/projects`.
 
 ### 3.6 The AI image generator (`ImageGenerator`)
-`topic → generateImage()` (image service) → preview from an object URL → **Use this image** → `uploadImage()` (`/upload/image`) → `onUploaded(url)` to the host form, which stores it as the project's `thumbnail_url`. It can be cancelled, times out after 90 s, keeps the previous preview when a new attempt fails, and revokes its object URLs when replaced or unmounted.
+`topic → generateImage()` (image service) → preview from an object URL → **Use this image** → `uploadImage()` (`/upload/image`) → `onUploaded(url)` to the host form, which stores it as the project's `thumbnail_url`. It lives in `ProjectForm`, folded away under "No picture? Generate one with AI" (a native `<details>`, so closing it doesn't throw away a running generation). Enter in its box generates instead of submitting the form. Save waits while it or `ImageUploadField` is uploading (`onUploadingChange`), so the picture isn't lost. It can be cancelled, times out after 90 s, keeps the previous preview when a new attempt fails, and revokes its object URLs when replaced or unmounted.
 
 ### 3.7 Registration and login
 ```
@@ -319,6 +319,7 @@ AppLayout
 
 - **Registering** confirms while places last, then waitlists; the toast says which. A waitlisted member sees their position and is emailed by the backend when a place opens.
 - **Cancelling** is allowed until the event starts (also after the deadline). The freed place goes to the first person waiting. Registering again puts you at the back of the line.
+- **Read API dates with `parseApiDate`** (used in `eventLabels`). SQLite in local development drops the time zone, so `new Date()` would show times an hour off in Lagos. Postgres keeps the zone, and the helper is right for both.
 - **The meeting link** is only in the API response for admins and confirmed members, so the page just shows it when present.
 - **Refreshing:** nearly every change moves a count shown on several screens, so `useEventActions` refreshes everything under `["events"]` (and the admin stats for create/delete/restore).
 - **Self check-in:** on `EventParticipants`, `CheckInPanel` opens check-in and shows the code large (for a projector), with New code / Close check-in. A confirmed member sees `CheckInForm` on the event page from an hour before the start until the end, while check-in is open. Only admins receive the code from the API.
@@ -351,6 +352,14 @@ The team rule is "justify every effect". There are exactly five, each with a com
 Everything else (form state, edit/view toggles, upload state) is plain state and event handlers.
 
 ## 5. Conventions we followed
+
+- **Links have three looks, so nothing reads like a footnote:**
+  - **`BackLink`** is "← All projects" above a detail page.
+  - **`SeeAllLink`** is "All events →" beside a section heading.
+  - **`textLinkClassName`** (in `Button/`) is for a link inside a sentence: mint, with a soft underline.
+  - Anything that does something is a button. Ghost buttons are mint too; mustard is kept for status badges.
+- **Dropdowns stay native `<select>`s, themed in `index.css`.** Chrome and Edge 135+ style the open list too (`appearance: base-select`). Other browsers keep their own menu, in dark colours.
+- **A failed refresh never hides what's on screen.** Show `ErrorState` only when there's no data (`isError && !data`), or a background refresh that fails puts an error box above numbers that are still fine.
 
 - **Components small and single-purpose** (all under the ~150–200 line guideline; the largest is `Register` at ~147). `Profile` and `Landing` are shells that compose focused pieces.
 - **Shared component = used on 2+ pages** (`TextField`, `PrefetchLink`, `ProtectedRoute`); otherwise it stays next to its page.

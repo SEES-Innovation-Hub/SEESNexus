@@ -1,5 +1,5 @@
 import ErrorState from "../../components/ErrorState";
-import PrefetchLink from "../../components/PrefetchLink";
+import SeeAllLink from "../../components/SeeAllLink";
 import Skeleton from "../../components/Skeleton";
 import { useEventList, useMyRegistrations } from "../../hooks/useEvents";
 import type { RegistrationStatus } from "../../types/events";
@@ -17,13 +17,11 @@ export function UpcomingEvents() {
 
   return (
     <section aria-labelledby="upcoming-events-heading" className="space-y-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="upcoming-events-heading" className="text-xl font-medium text-white">
           Upcoming events
         </h2>
-        <PrefetchLink to="/events" className="-my-3 py-3 text-sm text-sees-mustard underline hover:text-sees-mint">
-          All events
-        </PrefetchLink>
+        <SeeAllLink to="/events">All events</SeeAllLink>
       </div>
       {isPending && (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -32,7 +30,7 @@ export function UpcomingEvents() {
           ))}
         </div>
       )}
-      {isError && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
+      {isError && !data && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
       {data && data.items.length === 0 && <p className="text-sm text-white/50">Nothing scheduled yet.</p>}
       {data && data.items.length > 0 && (
         <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">

@@ -20,7 +20,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     "bg-sees-mint text-sees-forest not-disabled:hover:shadow-sees-glow disabled:not-aria-busy:bg-white/10 disabled:not-aria-busy:text-white/40",
   secondary:
     "border border-sees-teal text-sees-mint not-disabled:hover:border-sees-mint disabled:not-aria-busy:border-white/10 disabled:not-aria-busy:text-white/35",
-  ghost: "text-sees-mustard not-disabled:hover:text-sees-mint disabled:not-aria-busy:text-white/35",
+  ghost: "text-sees-mint/80 not-disabled:hover:text-sees-mint disabled:not-aria-busy:text-white/35",
   // Destructive actions only: delete, reject, remove. A deep red, so it reads as
   // serious without shouting over the mint and mustard brand colours.
   danger:

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { isHttpUrl } from "../../utils/isHttpUrl";
+import { textLinkClassName } from "../Button/textLinkClassName";
 
 // A small Markdown renderer for article bodies. It builds React elements and
 // never sets innerHTML, so whatever an author types can't inject markup or
@@ -23,7 +24,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     if (link) {
       const [, label, href] = link;
       return isHttpUrl(href) ? (
-        <a key={key} href={href} target="_blank" rel="noreferrer" className="text-sees-mustard underline hover:text-sees-mint">
+        <a key={key} href={href} target="_blank" rel="noreferrer" className={textLinkClassName}>
           {label}
         </a>
       ) : (

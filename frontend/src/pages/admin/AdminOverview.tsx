@@ -1,5 +1,5 @@
 import ErrorState from "../../components/ErrorState";
-import PrefetchLink from "../../components/PrefetchLink";
+import SeeAllLink from "../../components/SeeAllLink";
 import Skeleton from "../../components/Skeleton";
 import StatTile from "../../components/StatTile";
 import { useAdminLoanList } from "../../hooks/useAdminLoanList";
@@ -32,7 +32,7 @@ export function AdminOverview() {
           ))}
         </div>
       )}
-      {stats.isError && <ErrorState onRetry={() => void stats.refetch()} isRetrying={stats.isFetching} />}
+      {stats.isError && !stats.data && <ErrorState onRetry={() => void stats.refetch()} isRetrying={stats.isFetching} />}
       {stats.data && (
         <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <li>
@@ -66,16 +66,11 @@ export function AdminOverview() {
       )}
 
       <section aria-labelledby="waiting-heading" className="space-y-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="waiting-heading" className="text-xl font-medium text-white">
             Waiting for you
           </h2>
-          <PrefetchLink
-            to="/admin/loans"
-            className="-my-3 py-3 text-sm text-sees-mustard underline hover:text-sees-mint"
-          >
-            All loan requests
-          </PrefetchLink>
+          <SeeAllLink to="/admin/loans">All loan requests</SeeAllLink>
         </div>
         {loans && waiting.length === 0 && (
           <p className="text-sm text-white/50">No requests waiting. You're all caught up.</p>

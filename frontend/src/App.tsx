@@ -43,9 +43,6 @@ const EditArticle = lazy(() => pageLoaders.editArticle().then((m) => ({ default:
 const ComponentsPreview = lazy(() =>
   import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
 );
-const ImageGeneratorPreview = lazy(() =>
-  import("./pages/dev/ImageGeneratorPreview").then((m) => ({ default: m.ImageGeneratorPreview })),
-);
 
 function App() {
   return (
@@ -135,16 +132,6 @@ function App() {
           </Route>
         </Route>
         {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}
-        {import.meta.env.DEV && (
-          <Route
-            path="/dev/image-generator"
-            element={
-              <ProtectedRoute>
-                <ImageGeneratorPreview />
-              </ProtectedRoute>
-            }
-          />
-        )}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

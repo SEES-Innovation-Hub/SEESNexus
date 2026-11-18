@@ -1,4 +1,5 @@
 import type { EventPayload, EventType, SeesEvent } from "../../types/events";
+import { parseApiDate } from "../../utils/parseApiDate";
 import { isHttpUrl } from "../../utils/isHttpUrl";
 
 // What the form edits. Date inputs (datetime-local) hold "YYYY-MM-DDTHH:mm" in
@@ -41,7 +42,7 @@ export const EMPTY_VALUES: EventFormValues = {
 
 // ISO timestamp -> the local "YYYY-MM-DDTHH:mm" a datetime-local input shows.
 function toLocalInput(iso: string): string {
-  const date = new Date(iso);
+  const date = parseApiDate(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

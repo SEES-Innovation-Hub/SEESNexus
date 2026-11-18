@@ -1,8 +1,9 @@
-import { ArrowLeft, Pencil, Trash } from "lucide-react";
+import { Pencil, Trash } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { errorMessage, isNotFoundError } from "../../api/client";
 import Avatar from "../../components/Avatar";
+import BackLink from "../../components/BackLink";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { buttonClassName } from "../../components/Button/buttonClassName";
@@ -57,10 +58,7 @@ export function ArticleDetail() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PrefetchLink to="/articles" className="-my-3 inline-flex items-center gap-1 py-3 text-sm text-sees-mustard hover:text-sees-mint">
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        All news
-      </PrefetchLink>
+      <BackLink to="/articles">All news</BackLink>
 
       <Card as="article" padding="none" className="overflow-hidden">
         {article.cover_image_url && (

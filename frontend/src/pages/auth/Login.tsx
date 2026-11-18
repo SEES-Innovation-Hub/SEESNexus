@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { errorMessage } from "../../api/client";
 import Button from "../../components/Button";
+import { textLinkClassName } from "../../components/Button/textLinkClassName";
 import Card from "../../components/Card";
 import PrefetchLink from "../../components/PrefetchLink";
 import TextField from "../../components/TextField";
@@ -71,7 +72,7 @@ export function Login() {
           <p className="-mt-2 text-right text-sm">
             <PrefetchLink
               to="/forgot-password"
-              className="-my-3 inline-block py-3 text-sees-mustard underline hover:text-sees-mint"
+              className={`-my-3 inline-block py-3 ${textLinkClassName}`}
             >
               Forgot your password?
             </PrefetchLink>
@@ -94,7 +95,7 @@ export function Login() {
 
           <p className="text-sm text-white/60">
             No account?{" "}
-            <PrefetchLink to="/register" className="-my-3 inline-block py-3 text-sees-mustard underline hover:text-sees-mint">
+            <PrefetchLink to="/register" className={`-my-3 inline-block py-3 ${textLinkClassName}`}>
               Register
             </PrefetchLink>
           </p>

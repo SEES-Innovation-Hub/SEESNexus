@@ -1,5 +1,7 @@
+import { ChevronDown, Sparkles } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import Button from "../../components/Button";
+import ImageGenerator from "../../components/ImageGenerator";
 import ImageUploadField from "../../components/ImageUploadField";
 import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
@@ -41,6 +43,8 @@ export function ProjectForm({
 }: ProjectFormProps) {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<ProjectFormErrors>({});
+  // True while a picture uploads; Save waits so it isn't lost.
+  const [isImageBusy, setIsImageBusy] = useState(false);
 
   // Fixing a field clears its error straight away.
   function update<K extends keyof ProjectFormValues>(field: K, value: ProjectFormValues[K]) {
@@ -107,7 +111,24 @@ export function ProjectForm({
         onChange={(value) => update("thumbnailUrl", value)}
         hint="A screenshot or photo of the project. Shown on its card and page."
         error={errors.thumbnailUrl}
+        onUploadingChange={setIsImageBusy}
       />
+      {/* A native <details> stays mounted when closed, so a running generation
+          isn't thrown away. */}
+      <details className="group rounded-xl border border-sees-teal/40 px-4">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-medium text-sees-mint/80 transition hover:text-sees-mint">
+          <Sparkles aria-hidden="true" className="size-4" />
+          No picture? Generate one with AI
+          <ChevronDown aria-hidden="true" className="ml-auto size-4 transition group-open:rotate-180" />
+        </summary>
+        <div className="pb-4">
+          <ImageGenerator
+            defaultTopic={initialValues.title}
+            onUploaded={(url) => update("thumbnailUrl", url)}
+            onUploadingChange={setIsImageBusy}
+          />
+        </div>
+      </details>
       <TechStackInput value={values.techStack} onChange={(value) => update("techStack", value)} />
       <TeamPicker value={values.members} onChange={(value) => update("members", value)} lockedId={creatorId} />
       <div className="grid gap-5 sm:grid-cols-2">
@@ -143,7 +164,7 @@ export function ProjectForm({
         <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
           Cancel
         </Button>
-        <Button type="submit" isLoading={isSubmitting}>
+        <Button type="submit" isLoading={isSubmitting} disabled={isImageBusy}>
           {submitLabel}
         </Button>
       </div>
