@@ -1,14 +1,19 @@
 import pytest
 from httpx import AsyncClient
+from pydantic import ValidationError
+from sqlalchemy import select
 
-from app.core.config import settings
+from app.core.config import Settings, settings
+from app.models.user import User
 from app.services import email
 from app.tests.conftest import auth_header
 
 pytestmark = pytest.mark.asyncio
 
 
-async def _register_new_user(client: AsyncClient, email: str = "newbie@unilag.edu.ng") -> dict:
+async def _register_new_user(
+    client: AsyncClient, email: str = "newbie@unilag.edu.ng", admin_key: str | None = None
+) -> dict:
     send_resp = await client.post("/api/v1/notify/send-code", json={"email": email})
     code = send_resp.json()["data"]["debug_code"]
 
@@ -24,6 +29,7 @@ async def _register_new_user(client: AsyncClient, email: str = "newbie@unilag.ed
             "department": "EEE",
             "level": "200 Level",
             "verification_code": code,
+            **({"admin_key": admin_key} if admin_key is not None else {}),
         },
     )
     return register_resp
@@ -249,3 +255,65 @@ async def test_update_me_happy_path(client: AsyncClient, student_token: str):
 async def test_update_me_fails_without_auth(client: AsyncClient):
     resp = await client.put("/api/v1/auth/me", json={"bio": "hi"})
     assert resp.status_code == 401
+
+
+# --- admin sign-up with ADMIN_REGISTRATION_KEY ---
+
+ADMIN_KEY = "test-admin-key-0123456789abcdef"
+
+
+async def test_admin_key_creates_an_admin_who_can_use_admin_routes(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", ADMIN_KEY)
+
+    resp = await _register_new_user(client, email="boss@unilag.edu.ng", admin_key=ADMIN_KEY)
+    assert resp.status_code == 201
+    assert resp.json()["data"]["role"] == "ADMIN"
+    assert resp.json()["message"] == "Admin account created"
+
+    login = await client.post(
+        "/api/v1/auth/login", json={"email": "boss@unilag.edu.ng", "password": "SuperSecret1"}
+    )
+    token = login.json()["data"]["access_token"]
+    dashboard = await client.get(
+        "/api/v1/admin/dashboard", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert dashboard.status_code == 200
+
+
+async def test_wrong_admin_key_creates_no_account(client: AsyncClient, monkeypatch, db_session):
+    monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", ADMIN_KEY)
+
+    resp = await _register_new_user(client, email="sneaky@unilag.edu.ng", admin_key="not-the-key")
+    assert resp.status_code == 403
+    assert resp.json()["message"] == "Invalid admin key"
+    # Refused outright: no student account was made instead.
+    found = await db_session.execute(select(User).where(User.email == "sneaky@unilag.edu.ng"))
+    assert found.scalar_one_or_none() is None
+
+
+async def test_admin_signup_is_off_without_a_configured_key(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", "")
+    resp = await _register_new_user(client, email="x@unilag.edu.ng", admin_key="anything-at-all")
+    assert resp.status_code == 403
+    assert resp.json()["message"] == "Admin sign-up is not enabled on this server"
+
+
+async def test_blank_admin_key_is_an_ordinary_student_signup(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", ADMIN_KEY)
+    resp = await _register_new_user(client, email="plain@unilag.edu.ng", admin_key="  ")
+    assert resp.status_code == 201
+    assert resp.json()["data"]["role"] == "STUDENT"
+
+
+async def test_admin_key_check(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_REGISTRATION_KEY", ADMIN_KEY)
+    ok = await client.post("/api/v1/auth/admin-key/check", json={"admin_key": ADMIN_KEY})
+    assert ok.status_code == 200
+    bad = await client.post("/api/v1/auth/admin-key/check", json={"admin_key": "guess"})
+    assert bad.status_code == 403
+
+
+async def test_a_short_admin_key_is_refused_at_startup():
+    with pytest.raises(ValidationError):
+        Settings(ADMIN_REGISTRATION_KEY="too-short")
+    assert Settings(ADMIN_REGISTRATION_KEY="  " + ADMIN_KEY + "  ").ADMIN_REGISTRATION_KEY == ADMIN_KEY

@@ -183,6 +183,7 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 ```
 - `verify-code` **uses the code up**, and `register` only accepts an already-used code. That is why a failure at the register step sends the user back to the details form to request a fresh code, instead of leaving them on the OTP screen.
 - `Register` owns the state (`details`, `step`, `error`, `isSubmitting`); `OtpVerification` only shows the second screen.
+- **Admin sign-up:** ticking "I'm registering as an admin" shows an "Admin key" field. The key is checked with `POST /auth/admin-key/check` *before* the email code is sent (verifying the code uses it up, so a typo found later would mean a new code), then sent as `admin_key` with the registration. The right key makes an ADMIN account, which lands on `/admin`; a wrong one is refused with the backend's message. The key itself is set on the server (`ADMIN_REGISTRATION_KEY`) and shared privately.
 - **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate: to the page they wanted, or their home (`/admin` for admins, `/dashboard` for everyone else).
 - Both the login submit and the register "code verified" handler call `prefetchPages("profile")` first, so the Profile code downloads while the request runs.
 

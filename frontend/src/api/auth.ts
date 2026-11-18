@@ -20,6 +20,12 @@ export function register(payload: RegisterPayload) {
   return unwrap<User>(api.post("/auth/register", payload));
 }
 
+// 403 with "Invalid admin key" (or "not enabled") when it won't work. Checked
+// before the email code is sent, because verifying the code uses it up.
+export function checkAdminKey(adminKey: string) {
+  return unwrap<null>(api.post("/auth/admin-key/check", { admin_key: adminKey }));
+}
+
 export function login(email: string, password: string) {
   return unwrap<TokenPair>(api.post("/auth/login", { email, password }));
 }

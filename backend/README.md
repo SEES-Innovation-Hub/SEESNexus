@@ -96,6 +96,10 @@ always catch everything (e.g. some enum or index changes).
   SQLite; the app refuses to start otherwise, since every JWT is signed with it.
 - Tables are only auto-created for SQLite. Postgres is managed by Alembic:
   run `alembic upgrade head` on every deploy.
+- `ADMIN_REGISTRATION_KEY`: whoever registers with it (the "I'm registering
+  as an admin" option on the sign-up page) gets an ADMIN account. Keep it
+  private, at least 24 characters; empty switches admin sign-up off. To revoke
+  it, change it and redeploy; existing admins keep their accounts.
 - Email (OTP codes, waitlist promotions) goes through Brevo when
   `BREVO_API_KEY` is set; `BREVO_SENDER_EMAIL` must be a sender verified in Brevo.
 

@@ -6,6 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_SECRET_KEY = "dev-secret-change-me"
+MIN_ADMIN_KEY_LENGTH = 24
 
 
 class Settings(BaseSettings):
@@ -34,6 +35,12 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = "noreply@seesnexus.example"
     BREVO_SENDER_NAME: str = "SEES Nexus"
+
+    # --- Admin registration ---
+    # Whoever signs up with this key gets an ADMIN account. Shared privately by
+    # the project owners. Empty = admin sign-up is switched off, and admins can
+    # only be made by an existing admin changing someone's role.
+    ADMIN_REGISTRATION_KEY: str = ""
 
     # --- CORS ---
     CORS_ORIGINS: str = "http://localhost:5173"
@@ -64,6 +71,18 @@ class Settings(BaseSettings):
         if placeholder and not self.is_sqlite:
             raise ValueError("SECRET_KEY must be set to a private value when using a real database")
         return self
+
+    @field_validator("ADMIN_REGISTRATION_KEY")
+    @classmethod
+    def _admin_key_long_enough(cls, value: str) -> str:
+        # The key can be tried against /auth/admin-key/check, so it must be too
+        # long to guess. 24 characters of token_urlsafe is ~144 bits.
+        value = value.strip()
+        if value and len(value) < MIN_ADMIN_KEY_LENGTH:
+            raise ValueError(
+                f"ADMIN_REGISTRATION_KEY must be at least {MIN_ADMIN_KEY_LENGTH} characters"
+            )
+        return value
 
     @property
     def is_sqlite(self) -> bool:

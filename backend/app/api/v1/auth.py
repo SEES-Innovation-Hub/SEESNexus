@@ -1,7 +1,11 @@
+import logging
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.security import (
@@ -13,9 +17,10 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import (
     AccessTokenData,
+    AdminKeyCheckRequest,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
@@ -27,10 +32,46 @@ from app.schemas.envelope import success
 from app.services import otp
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
+
+
+def _assert_admin_key(candidate: str) -> None:
+    """403 unless candidate is this deployment's ADMIN_REGISTRATION_KEY.
+
+    Constant-time comparison, so response timing says nothing about how much of
+    a guess was right. Failures are logged (never the key itself) so repeated
+    attempts show up in the logs.
+    """
+    expected = settings.ADMIN_REGISTRATION_KEY
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin sign-up is not enabled on this server",
+        )
+    if not secrets.compare_digest(candidate.strip().encode(), expected.encode()):
+        logger.warning("Rejected an admin registration key")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin key")
+
+
+@router.post("/admin-key/check")
+async def check_admin_key(payload: AdminKeyCheckRequest):
+    """Let the sign-up form check the key before the email code is spent.
+
+    /notify/verify-code uses the code up, so a key that is only checked at
+    /register would make someone who mistyped it start over with a new code.
+    Guessing through here is hopeless: the key is at least 24 characters.
+    """
+    _assert_admin_key(payload.admin_key)
+    return success(message="Admin key accepted")
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    # Checked first: a bad key must never fall through to a student account.
+    is_admin = bool(payload.admin_key and payload.admin_key.strip())
+    if is_admin:
+        _assert_admin_key(payload.admin_key)
+
     existing = await db.execute(select(User).where(User.email == payload.email))
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -47,12 +88,16 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
         password=hash_password(payload.password),
         department=payload.department,
         level=payload.level,
+        role=UserRole.ADMIN if is_admin else UserRole.STUDENT,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    return success(data=UserPublic.model_validate(user).model_dump(mode="json"), message="Account created")
+    return success(
+        data=UserPublic.model_validate(user).model_dump(mode="json"),
+        message="Admin account created" if is_admin else "Account created",
+    )
 
 
 @router.post("/login")

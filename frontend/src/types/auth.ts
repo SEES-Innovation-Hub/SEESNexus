@@ -27,6 +27,8 @@ export interface RegisterPayload {
   department: string;
   level: string;
   verification_code: string;
+  // The private key that makes this an ADMIN account. Omit for a student.
+  admin_key?: string;
 }
 
 export interface UserUpdatePayload {

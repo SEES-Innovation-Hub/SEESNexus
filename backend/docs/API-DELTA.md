@@ -243,3 +243,21 @@ because the frontend serves its "write an article" page at `/articles/new`.
 - With any non-SQLite database the app refuses to start if `SECRET_KEY` is the built-in default or
   starts with `change-me` (the `.env.example` placeholder).
 - Tables are created on start-up only for SQLite; Postgres is Alembic-only.
+
+---
+
+## §5.1 Auth — admin sign-up with an admin key
+
+**Document:** every account registers as a STUDENT; only an admin can change roles.
+
+**Implementation:**
+
+- `POST /register` accepts an optional `admin_key`. If it matches the server's
+  `ADMIN_REGISTRATION_KEY` the account is created as `ADMIN`. A wrong key is `403 "Invalid admin key"`
+  and creates **no** account (never a silent student account). A blank key is an ordinary sign-up. The
+  email code is still required.
+- `POST /admin-key/check` `{admin_key}` — `200` if valid, `403` otherwise. The frontend calls it before
+  sending the email code, because verifying the code uses it up.
+- With `ADMIN_REGISTRATION_KEY` unset, both answer `403 "Admin sign-up is not enabled on this server"`.
+- The key must be at least 24 characters (the app refuses to start otherwise), is compared in constant
+  time, and rejected attempts are logged without the key.

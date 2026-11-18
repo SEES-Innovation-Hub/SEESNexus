@@ -23,6 +23,13 @@ class RegisterRequest(BaseModel):
     # Proof that /notify/verify-code succeeded for this email, per Tech Doc §5.1
     # ("Create account (requires prior OTP verification)").
     verification_code: str
+    # Optional. The right ADMIN_REGISTRATION_KEY makes this an ADMIN account; a
+    # wrong one is refused rather than quietly creating a student account.
+    admin_key: str | None = Field(default=None, max_length=256)
+
+
+class AdminKeyCheckRequest(BaseModel):
+    admin_key: str = Field(min_length=1, max_length=256)
 
 
 class LoginRequest(BaseModel):

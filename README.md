@@ -25,6 +25,7 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 
 - **Backend (Render):** `DATABASE_URL` (Render's `postgres://` URL works as is),
   a private `SECRET_KEY` (the app refuses to start against Postgres without one),
+  `ADMIN_REGISTRATION_KEY` (shared only with people who should become admins),
   `CORS_ORIGINS` set to the frontend's origin, `BREVO_API_KEY` and a verified
   `BREVO_SENDER_EMAIL`, `OTP_DEBUG_RETURN_CODE=false`, and the `CLOUDINARY_*`
   keys. Run `alembic upgrade head` on each deploy.
