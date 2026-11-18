@@ -49,6 +49,7 @@ export interface HardwarePayload {
   category: HardwareCategory;
   quantity: number;
   description: string | null;
+  image_url: string | null;
   status?: HardwareStatus;
 }
 

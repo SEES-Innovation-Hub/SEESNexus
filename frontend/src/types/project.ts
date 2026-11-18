@@ -34,6 +34,7 @@ export interface ProjectPayload {
   status: ProjectStatus;
   github_url: string | null;
   demo_url: string | null;
+  thumbnail_url: string | null;
   member_ids?: string[];
 }
 

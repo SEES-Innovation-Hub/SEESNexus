@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import Button from "../../components/Button";
+import ImageUploadField from "../../components/ImageUploadField";
 import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
 import TextField from "../../components/TextField";
@@ -99,6 +100,14 @@ export function ProjectForm({
           options={STATUS_OPTIONS}
         />
       </div>
+      <ImageUploadField
+        id="project-thumbnailUrl"
+        label="Thumbnail"
+        value={values.thumbnailUrl}
+        onChange={(value) => update("thumbnailUrl", value)}
+        hint="A screenshot or photo of the project. Shown on its card and page."
+        error={errors.thumbnailUrl}
+      />
       <TechStackInput value={values.techStack} onChange={(value) => update("techStack", value)} />
       <TeamPicker value={values.members} onChange={(value) => update("members", value)} lockedId={creatorId} />
       <div className="grid gap-5 sm:grid-cols-2">

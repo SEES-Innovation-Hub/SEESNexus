@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
+import ImageUploadField from "../../components/ImageUploadField";
 import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
 import TextField from "../../components/TextField";
@@ -156,14 +157,12 @@ export function EventForm({
           />
         )}
       </div>
-      <TextField
+      <ImageUploadField
         id="event-bannerUrl"
-        label="Banner image link"
-        type="url"
-        required={false}
+        label="Banner image"
         value={values.bannerUrl}
         onChange={(value) => update("bannerUrl", value)}
-        placeholder="https://…"
+        hint="Shown wide at the top of the event. Landscape works best."
         error={errors.bannerUrl}
       />
 

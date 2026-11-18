@@ -86,18 +86,18 @@ src/
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
     Avatar/  ProtectedRoute/  GuestRoute/  RoleRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/  StatTile/
-    Checkbox/  Markdown/   (see §3.10)
+    Checkbox/  Markdown/  ImageUploadField/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
     landing/   Landing, LandingNav, HeroSection,
                PillarsSection, TeamSection, JoinSection, LandingFooter
     auth/      Login, Register, OtpVerification
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
-    projects/  ProjectsList, ProjectDetail, NewProject, EditProject, ProjectForm, TechStackInput,
+    projects/  ProjectsList, ProjectDetail, NewProject, EditProject, ProjectForm, TechStackInput, TeamPicker,
                ProjectNotFound, projectFormValues (values, limits, validation)
     hardware/  HardwareList, HardwareCard, LoanRequestModal, cardActionId
     loans/     MyLoans, LoanCard
     dashboard/ Dashboard, UpcomingEvents, DashboardLoans, LatestProjects
-    events/    EventsList, EventCard, EventDetail, RegistrationPanel, MyEvents, NewEvent, EditEvent,
+    events/    EventsList, EventCard, EventDetail, RegistrationPanel, CheckInForm, CheckInPanel, MyEvents, NewEvent, EditEvent,
                EventForm, eventFormValues, EventParticipants, EventNotFound
     articles/  ArticlesList, ArticleCard, ArticleDetail, NewArticle, EditArticle, ArticleForm,
                articleFormValues, ArticleNotFound
@@ -223,6 +223,7 @@ All in `src/components/`, one folder each, default export. See every one of them
 | `TextField`, `TextArea`, `Select` | Form fields | Built on `Field` (label + hint + error). `error` turns the border red and is read out by screen readers. Optional fields are labelled "(optional)" automatically. |
 | `Avatar` | A person's photo or initial | `name`, `imageUrl`, `size` (px). Decorative: put the name next to it. |
 | `Checkbox` | A yes/no option | Native checkbox with the label beside it (44px tap target), optional `hint`. |
+| `ImageUploadField` | Any image on a form | Uploads on pick (`POST /upload/image`, JPEG/PNG/WebP/GIF, 5 MB), previews, Replace / Remove, "Use a link instead" (shown automatically when the server has no Cloudinary keys). Holds the URL as a string. |
 | `Markdown` | Showing an article body | Builds React elements, never `innerHTML`; links only for http(s). See §3.16. |
 | `RoleRoute` | Pages only some roles may open | `roles={["CONTRIBUTOR", "ADMIN"]}`. Not signed in → `/login`; wrong role → their own start page. The backend enforces the real rule. |
 | `AdminRoute` | Wrapping admin-only pages | `RoleRoute` with `["ADMIN"]`. |
@@ -267,8 +268,8 @@ AppLayout
 - **Permissions** come from `utils/canEditProject.ts`, which mirrors the backend rule (creator or admin). The UI only hides what can't be done; the backend still decides.
 - **`ProjectForm`** owns the field values and validation (`projectFormValues.ts`: limits copied from the backend schema, per-field messages, and `toPayload` turning empty links into `null`). The pages decide what Save does. `noValidate` replaces the browser's popups with our own messages, and the first invalid field gets focus.
 - **Tech stack** chips: Enter or comma adds one, Backspace on an empty box removes the last, and text left in the box is added when it loses focus. Max 20 chips of 50 characters (backend limits).
-- **Members:** on create the creator is sent as the only member (`member_ids: [user.id]`). Edit never sends `member_ids`, so the backend keeps the team. A member picker needs a user-search endpoint the backend doesn't have yet.
-- **No thumbnail field** until `/upload/image` exists. Cards and the detail page show the category as a stand-in.
+- **Team:** `TeamPicker` shows the team as chips and searches members by name (`useUserSearch` → `GET /users/search`, from 2 characters). The creator is always on the team and has no remove button; the backend keeps them too. Create and edit both send `member_ids`, which replaces the team.
+- **Thumbnail:** `ImageUploadField` uploads to Cloudinary through `/upload/image`; cards and the detail page show the category as a stand-in when there is none.
 - **After a change:** create/update put the new record straight into the detail cache and refresh every list. Delete removes the detail and refreshes the lists.
 
 ### 3.13 Hardware and loans
@@ -318,6 +319,7 @@ AppLayout
 - **Cancelling** is allowed until the event starts (also after the deadline). The freed place goes to the first person waiting. Registering again puts you at the back of the line.
 - **The meeting link** is only in the API response for admins and confirmed members, so the page just shows it when present.
 - **Refreshing:** nearly every change moves a count shown on several screens, so `useEventActions` refreshes everything under `["events"]` (and the admin stats for create/delete/restore).
+- **Self check-in:** on `EventParticipants`, `CheckInPanel` opens check-in and shows the code large (for a projector), with New code / Close check-in. A confirmed member sees `CheckInForm` on the event page from an hour before the start until the end, while check-in is open. Only admins receive the code from the API.
 - **Deleted events** stay restorable: admins find them under Events → Deleted, open one and press Restore; registrations come back with it.
 
 ### 3.16 News (articles)

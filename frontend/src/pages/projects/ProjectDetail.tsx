@@ -80,8 +80,8 @@ export function ProjectDetail() {
             className="aspect-[21/9] w-full object-cover"
           />
         ) : (
-          // Until thumbnails can be uploaded most projects have none, so the
-          // stand-in is a slim banner rather than an empty full-size image box.
+          // Without a thumbnail the stand-in is a slim banner rather than an
+          // empty full-size image box.
           <div
             aria-hidden="true"
             className="flex h-24 w-full items-center justify-center bg-sees-glass font-mono text-sees-mint/60 sm:h-32"

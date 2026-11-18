@@ -7,6 +7,7 @@ export interface HardwareFormValues {
   category: HardwareCategory | "";
   quantity: string;
   description: string;
+  imageUrl: string;
 }
 
 export type HardwareFormErrors = Partial<Record<keyof HardwareFormValues, string>>;
@@ -22,6 +23,7 @@ export const EMPTY_HARDWARE: HardwareFormValues = {
   category: "",
   quantity: "1",
   description: "",
+  imageUrl: "",
 };
 
 export function toHardwareFormValues(item: Hardware): HardwareFormValues {
@@ -31,6 +33,7 @@ export function toHardwareFormValues(item: Hardware): HardwareFormValues {
     category: item.category,
     quantity: String(item.quantity),
     description: item.description ?? "",
+    imageUrl: item.image_url ?? "",
   };
 }
 
@@ -65,5 +68,6 @@ export function toHardwarePayload(values: HardwareFormValues): HardwarePayload {
     category: values.category as HardwareCategory,
     quantity: Number(values.quantity),
     description: values.description.trim() || null,
+    image_url: values.imageUrl.trim() || null,
   };
 }

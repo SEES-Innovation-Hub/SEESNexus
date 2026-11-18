@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import Button from "../../components/Button";
+import ImageUploadField from "../../components/ImageUploadField";
 import Markdown from "../../components/Markdown";
 import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
@@ -111,17 +112,14 @@ export function ArticleForm({ initialValues, isEdit, isSubmitting, serverError, 
         )}
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <TextField
-          id="article-coverImageUrl"
-          label="Cover image link"
-          type="url"
-          required={false}
-          value={values.coverImageUrl}
-          onChange={(value) => update("coverImageUrl", value)}
-          placeholder="https://…"
-          error={errors.coverImageUrl}
-        />
+      <ImageUploadField
+        id="article-coverImageUrl"
+        label="Cover image"
+        value={values.coverImageUrl}
+        onChange={(value) => update("coverImageUrl", value)}
+        error={errors.coverImageUrl}
+      />
+      <div className="max-w-md">
         <Select
           id="article-status"
           label="Visibility"

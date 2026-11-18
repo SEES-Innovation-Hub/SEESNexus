@@ -3,6 +3,7 @@ import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { buttonClassName } from "../../components/Button/buttonClassName";
 import Card from "../../components/Card";
+import { isHttpUrl } from "../../utils/isHttpUrl";
 import PrefetchLink from "../../components/PrefetchLink";
 import type { Hardware, HardwareCategory, Loan } from "../../types/hardware";
 import {
@@ -54,6 +55,17 @@ export function HardwareCard(props: HardwareCardProps) {
 
   return (
     <Card as="article" className="flex h-full flex-col gap-4">
+      {isHttpUrl(item.image_url) && (
+        <img
+          src={item.image_url}
+          alt=""
+          width={480}
+          height={270}
+          loading="lazy"
+          decoding="async"
+          className="-mx-5 -mt-5 aspect-video w-[calc(100%+2.5rem)] max-w-none rounded-t-2xl object-cover"
+        />
+      )}
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"

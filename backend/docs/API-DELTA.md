@@ -261,3 +261,53 @@ because the frontend serves its "write an article" page at `/articles/new`.
 - With `ADMIN_REGISTRATION_KEY` unset, both answer `403 "Admin sign-up is not enabled on this server"`.
 - The key must be at least 24 characters (the app refuses to start otherwise), is compared in constant
   time, and rejected attempts are logged without the key.
+
+---
+
+## §5.7 Admin — promoting to `ADMIN` needs the admin key
+
+`PUT /admin/users/{id}/role` with `"role": "ADMIN"` now requires `admin_key` (same check as sign-up,
+`app/core/admin_key.py`): `403 "Invalid admin key"` otherwise, and `403` when no key is configured.
+Demoting, or any other role change, needs no key. The admin key is therefore the only way to become an
+admin.
+
+---
+
+## §5.5 Events — self check-in
+
+**New column:** `checkin_code` on events (migration `e8c3a7d15b92`).
+
+| Route | Who | |
+|---|---|---|
+| `POST /{id}/checkin-code` | admin | Open check-in, or replace the code. Returns the event. |
+| `DELETE /{id}/checkin-code` | admin | Close check-in. |
+| `POST /{id}/checkin` `{code}` | JWT | A `CONFIRMED` member checks in: sets `attended_at`. |
+
+- Codes: 6 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789`; matched case-insensitively, trimmed,
+  in constant time.
+- Window: from 1 hour before `start_date` until `end_date` (`400` outside it). `400` when check-in is
+  closed or the code is wrong; `403` for anyone without a confirmed place. Checking in twice is `200`.
+- Event responses gain `checkin_open` (everyone) and `checkin_code` (admins only, `null` for others).
+
+---
+
+## §5.3 Projects — the creator is always on the team
+
+`member_ids` still replaces the team, but the creator is always kept (listed first), on create and on
+update, whoever makes the edit.
+
+---
+
+## §5.x Users — search treats `%` and `_` literally
+
+`GET /users/search?q=` (and the article `search` filter) escape LIKE wildcards; `q=%` used to list every
+active member.
+
+---
+
+## Upload — `POST /upload/image`
+
+- The format is checked from the file's bytes: JPEG, PNG, WebP or GIF (`400` otherwise; SVG refused).
+- The Cloudinary call runs in a worker thread (it is synchronous and used to block the server).
+- Images go to the `sees-nexus` folder.
+- Provider errors are logged, not returned: `502 "The image couldn't be uploaded. Try again in a moment."`

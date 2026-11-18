@@ -103,3 +103,93 @@ async def test_upload_503_when_cloudinary_not_configured(
         headers=auth_header(student_token),
     )
     assert resp.status_code == 503
+
+
+async def test_upload_checks_the_bytes_not_the_label(
+    client: AsyncClient, student_token: str, configured_cloudinary
+):
+    # A script renamed to .png and labelled image/png is still refused.
+    disguised = await client.post(
+        ENDPOINT,
+        files={"file": ("cat.png", b"<script>alert(1)</script>", "image/png")},
+        headers=auth_header(student_token),
+    )
+    assert disguised.status_code == 400
+    svg = await client.post(
+        ENDPOINT,
+        files={"file": ("logo.svg", b'<svg xmlns="http://www.w3.org/2000/svg"/>', "image/svg+xml")},
+        headers=auth_header(student_token),
+    )
+    assert svg.status_code == 400
+    assert svg.json()["message"] == "File must be a JPEG, PNG, WebP or GIF image"
+
+
+async def test_provider_errors_are_not_leaked(
+    client: AsyncClient, student_token: str, configured_cloudinary, monkeypatch
+):
+    import cloudinary.uploader
+
+    def broken(data, **kwargs):
+        raise RuntimeError("Invalid api_key test-key for cloud test-cloud")
+
+    monkeypatch.setattr(cloudinary.uploader, "upload", broken)
+    resp = await client.post(
+        ENDPOINT, files={"file": ("tiny.png", PNG_1x1, "image/png")}, headers=auth_header(student_token)
+    )
+    assert resp.status_code == 502
+    assert "test-key" not in resp.json()["message"]
+
+
+async def test_real_sdk_sends_a_signed_upload(client: AsyncClient, student_token: str, monkeypatch):
+    """The real Cloudinary SDK, pointed at a local stand-in for api.cloudinary.com.
+
+    The other tests replace the SDK call; this one checks what our settings
+    make it actually send: a signed multipart POST to the account's upload
+    endpoint, into our folder, and that we return the secure_url it answers.
+    """
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    import cloudinary
+
+    seen: dict = {}
+
+    class FakeCloudinary(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802 (http.server's naming)
+            seen["path"] = self.path
+            seen["body"] = self.rfile.read(int(self.headers["Content-Length"]))
+            payload = json.dumps(
+                {"secure_url": "https://res.cloudinary.com/sees-test/image/upload/v1/sees-nexus/x.png"}
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), FakeCloudinary)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(settings, "CLOUDINARY_CLOUD_NAME", "sees-test")
+    monkeypatch.setattr(settings, "CLOUDINARY_API_KEY", "123456789")
+    monkeypatch.setattr(settings, "CLOUDINARY_API_SECRET", "not-a-real-secret")
+    cloudinary.config(upload_prefix=f"http://127.0.0.1:{server.server_port}")
+    try:
+        resp = await client.post(
+            ENDPOINT, files={"file": ("tiny.png", PNG_1x1, "image/png")}, headers=auth_header(student_token)
+        )
+    finally:
+        server.shutdown()
+        cloudinary.config(upload_prefix=None)
+
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["data"]["url"].endswith("/sees-nexus/x.png")
+    assert seen["path"] == "/v1_1/sees-test/image/upload"
+    body = seen["body"]
+    for field in (b'name="signature"', b'name="api_key"', b"123456789", b'name="folder"', b"sees-nexus"):
+        assert field in body
+    assert b"not-a-real-secret" not in body  # the secret signs the request; it is never sent
+    assert PNG_1x1 in body

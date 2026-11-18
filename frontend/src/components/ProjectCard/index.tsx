@@ -57,7 +57,7 @@ export default function ProjectCard({ project }: { project: Project }) {
           className="aspect-video w-full object-cover"
         />
       ) : (
-        // Without a thumbnail (every project until uploads exist) a phone gets a
+        // Without a thumbnail a phone gets a
         // slim banner instead of a tall empty box; wider screens keep the
         // picture's shape so cards in a row line up.
         <div

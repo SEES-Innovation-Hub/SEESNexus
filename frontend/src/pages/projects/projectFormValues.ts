@@ -11,6 +11,7 @@ export interface ProjectFormValues {
   techStack: string[];
   githubUrl: string;
   demoUrl: string;
+  thumbnailUrl: string;
   // The whole team; sent as member_ids, which replaces the team on save.
   members: ProjectMember[];
 }
@@ -31,6 +32,7 @@ export const EMPTY_VALUES: ProjectFormValues = {
   techStack: [],
   githubUrl: "",
   demoUrl: "",
+  thumbnailUrl: "",
   members: [],
 };
 
@@ -43,6 +45,7 @@ export function toFormValues(project: Project): ProjectFormValues {
     techStack: project.tech_stack,
     githubUrl: project.github_url ?? "",
     demoUrl: project.demo_url ?? "",
+    thumbnailUrl: project.thumbnail_url ?? "",
     members: project.members,
   };
 }
@@ -63,6 +66,7 @@ export function validate(values: ProjectFormValues): ProjectFormErrors {
     category: values.category ? undefined : "Pick a category.",
     githubUrl: validateUrl(values.githubUrl.trim()),
     demoUrl: validateUrl(values.demoUrl.trim()),
+    thumbnailUrl: validateUrl(values.thumbnailUrl.trim()),
   };
   return Object.fromEntries(Object.entries(errors).filter(([, message]) => message)) as ProjectFormErrors;
 }
@@ -77,6 +81,7 @@ export function toPayload(values: ProjectFormValues): ProjectPayload {
     tech_stack: values.techStack,
     github_url: values.githubUrl.trim() || null,
     demo_url: values.demoUrl.trim() || null,
+    thumbnail_url: values.thumbnailUrl.trim() || null,
     member_ids: values.members.map((member) => member.id),
   };
 }

@@ -3,6 +3,7 @@ import { errorMessage } from "../../api/client";
 import Button from "../../components/Button";
 import Modal from "../../components/Modal";
 import Select from "../../components/Select";
+import ImageUploadField from "../../components/ImageUploadField";
 import TextArea from "../../components/TextArea";
 import TextField from "../../components/TextField";
 import { useCreateHardware } from "../../hooks/useCreateHardware";
@@ -99,6 +100,13 @@ function HardwareForm({ item, onDone }: { item: HardwareFormTarget; onDone: () =
         onChange={(v) => set("description", v)}
         maxLength={DESCRIPTION_MAX}
         hint="Model, condition, what's in the box."
+      />
+      <ImageUploadField
+        id="hardware-imageUrl"
+        label="Photo"
+        value={values.imageUrl}
+        onChange={(v) => set("imageUrl", v)}
+        hint="Helps members recognise it on the shelf."
       />
       {save.error && (
         <p role="alert" className="text-sm wrap-anywhere text-red-400">
