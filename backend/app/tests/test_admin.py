@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +21,33 @@ async def test_dashboard_happy_path(client: AsyncClient, admin_token: str, stude
     assert data["total_users"] >= 2
     assert data["students"] >= 1
     assert data["admins"] >= 1
+
+
+async def test_dashboard_excludes_soft_deleted_events(client: AsyncClient, admin_token: str):
+    """Events are soft-deleted, so a bare row count overstates the total."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "title": "Doomed Event",
+        "description": "Created, then deleted.",
+        "event_type": "WORKSHOP",
+        "location": "Lab 1",
+        "is_virtual": False,
+        "start_date": (now + timedelta(days=3)).isoformat(),
+        "end_date": (now + timedelta(days=3, hours=2)).isoformat(),
+        "registration_deadline": (now + timedelta(days=2)).isoformat(),
+    }
+    created = await client.post("/api/v1/events", json=payload, headers=auth_header(admin_token))
+    assert created.status_code == 201
+    event_id = created.json()["data"]["id"]
+
+    before = await client.get("/api/v1/admin/dashboard", headers=auth_header(admin_token))
+    assert before.json()["data"]["total_events"] == 1
+
+    deleted = await client.delete(f"/api/v1/events/{event_id}", headers=auth_header(admin_token))
+    assert deleted.status_code == 200
+
+    after = await client.get("/api/v1/admin/dashboard", headers=auth_header(admin_token))
+    assert after.json()["data"]["total_events"] == 0
 
 
 async def test_dashboard_forbidden_for_student(client: AsyncClient, student_token: str):

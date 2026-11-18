@@ -6,10 +6,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_admin
+from app.core.deps import get_current_user, get_current_user_optional, require_admin
 from app.core.pagination import MAX_PAGE_SIZE, paginate, total_pages
 from app.models.events import Event, EventRegistration, EventType, RegistrationStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.envelope import success
 from app.schemas.events import (
     EventCreate,
@@ -24,8 +24,70 @@ from app.schemas.events import (
 router = APIRouter(prefix="/events", tags=["events"])
 
 
-def _serialize_event(event: Event) -> dict:
-    return EventResponse.model_validate(event).model_dump(mode="json")
+def _may_see_virtual_link(event: Event, viewer: User | None) -> bool:
+    """Who gets the meeting link.
+
+    Tech Doc §5.5 makes the event list and detail readable by anyone, and §4.2
+    says nothing about who may see virtual_link -- so the routes stay public and
+    the link is withheld instead. Publishing it with the event would hand a
+    joinable meeting URL to every anonymous visitor the moment an admin created
+    the event.
+
+    Admins see it because they run the event. A waitlisted student does not:
+    they have no place yet, and that is the whole distinction waitlisting draws.
+    """
+    if viewer is None:
+        return False
+    if viewer.role == UserRole.ADMIN:
+        return True
+    return any(
+        registration.student_id == viewer.id
+        and registration.status == RegistrationStatus.CONFIRMED
+        for registration in event.registrations
+    )
+
+
+def _event_response(event: Event, viewer: User | None) -> EventResponse:
+    """Build the response for one event, as seen by `viewer`.
+
+    Event.registrations is lazy="selectin", so the rows are already loaded by the
+    time we get here -- counting them in Python costs no extra query, on the list
+    route as much as on detail.
+    """
+    confirmed = sum(
+        1 for r in event.registrations if r.status == RegistrationStatus.CONFIRMED
+    )
+    response = EventResponse.model_validate(event)
+    return response.model_copy(
+        update={
+            "confirmed_count": confirmed,
+            "spots_left": (
+                None
+                if event.max_participants is None
+                else max(event.max_participants - confirmed, 0)
+            ),
+            "virtual_link": (
+                event.virtual_link if _may_see_virtual_link(event, viewer) else None
+            ),
+        }
+    )
+
+
+def _serialize_event(event: Event, viewer: User | None) -> dict:
+    return _event_response(event, viewer).model_dump(mode="json")
+
+
+async def _confirmed_count(db: AsyncSession, event_id: str) -> int:
+    """How many students hold a place. Reads committed state, not loaded rows."""
+    result = await db.execute(
+        select(func.count())
+        .select_from(EventRegistration)
+        .where(
+            EventRegistration.event_id == event_id,
+            EventRegistration.status == RegistrationStatus.CONFIRMED,
+        )
+    )
+    return result.scalar_one()
 
 
 async def _get_event_or_404(db: AsyncSession, event_id: str, *, include_deleted: bool = False) -> Event:
@@ -55,16 +117,23 @@ async def list_events(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1),
     event_type: EventType | None = None,
+    upcoming: bool = Query(
+        default=False, description="Only events that have not started yet."
+    ),
+    viewer: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Event).where(Event.deleted_at.is_(None))
     if event_type is not None:
         stmt = stmt.where(Event.event_type == event_type)
+    if upcoming:
+        stmt = stmt.where(Event.start_date >= datetime.now(timezone.utc))
+    # Soonest first, which is the order the filter is usually asked for.
     stmt = stmt.order_by(Event.start_date.asc())
     events, total = await paginate(db, stmt, page, page_size)
     effective_page_size = min(page_size, MAX_PAGE_SIZE)
     data = PaginatedEventsResponse(
-        items=[EventResponse.model_validate(event) for event in events],
+        items=[_event_response(event, viewer) for event in events],
         page=page,
         page_size=effective_page_size,
         total=total,
@@ -74,9 +143,13 @@ async def list_events(
 
 
 @router.get("/{event_id}")
-async def get_event(event_id: str, db: AsyncSession = Depends(get_db)):
+async def get_event(
+    event_id: str,
+    viewer: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
     event = await _get_event_or_404(db, event_id)
-    return success(data=_serialize_event(event))
+    return success(data=_serialize_event(event, viewer))
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -90,7 +163,7 @@ async def create_event(
     db.add(event)
     await db.commit()
     await db.refresh(event)
-    return success(data=_serialize_event(event), message="Event created")
+    return success(data=_serialize_event(event, admin), message="Event created")
 
 
 @router.put("/{event_id}")
@@ -109,12 +182,44 @@ async def update_event(
     ).scalar_one_or_none()
     if event is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+
+    # Checked against the payload, before anything is assigned to the event.
+    # Any query issued after an assignment -- _confirmed_count below is one --
+    # triggers an autoflush that writes the pending value, so a rejection has
+    # to happen before the object is touched or the rejected cap reaches the
+    # database anyway.
+    #
+    # Shrinking the cap below the number of students who already hold a place
+    # would leave the event oversubscribed with no way to say who lost their
+    # seat. Same guard, same reasoning as adjust_total_quantity() in
+    # services/loans.py. The row is locked above, so the count cannot move
+    # underneath the check.
+    if updates.get("max_participants") is not None:
+        confirmed = await _confirmed_count(db, event.id)
+        if updates["max_participants"] < confirmed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "max_participants cannot be lower than the number of confirmed "
+                    f"registrations ({confirmed})"
+                ),
+            )
+
+    for field, value in updates.items():
         setattr(event, field, value)
-    _validate_event_dates(event)
+
+    try:
+        _validate_event_dates(event)
+    except HTTPException:
+        # Same hazard as above: the fields are already assigned, so discard them
+        # rather than leave a dirty instance for the next query to flush.
+        await db.rollback()
+        raise
+
     await db.commit()
     await db.refresh(event)
-    return success(data=_serialize_event(event), message="Event updated")
+    return success(data=_serialize_event(event, admin), message="Event updated")
 
 
 @router.delete("/{event_id}")
@@ -156,16 +261,7 @@ async def register_for_event(
     if existing is not None:
         raise HTTPException(status_code=409, detail="You are already registered for this event")
 
-    confirmed_count = (
-        await db.execute(
-            select(func.count())
-            .select_from(EventRegistration)
-            .where(
-                EventRegistration.event_id == event.id,
-                EventRegistration.status == RegistrationStatus.CONFIRMED,
-            )
-        )
-    ).scalar_one()
+    confirmed_count = await _confirmed_count(db, event.id)
     registration_status = (
         RegistrationStatus.WAITLISTED
         if event.max_participants is not None and confirmed_count >= event.max_participants
