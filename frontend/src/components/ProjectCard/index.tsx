@@ -2,6 +2,7 @@ import type { Project, ProjectMember } from "../../types/project";
 import { isHttpUrl } from "../../utils/isHttpUrl";
 import { CATEGORY_LABELS, STATUS_LABELS } from "../../utils/projectLabels";
 import Badge from "../Badge";
+import { textLinkClassName } from "../Button/textLinkClassName";
 import PrefetchLink from "../PrefetchLink";
 
 const MAX_TECH_BADGES = 4;
@@ -37,7 +38,7 @@ function MemberAvatar({ member }: { member: ProjectMember }) {
 // py-3 with -my-3 grows the tap area to 44px without growing the card.
 // relative z-10 lifts the links above the card-wide project link.
 const linkClassName =
-  "relative z-10 -mx-1.5 -my-3 px-1.5 py-3 text-sees-mustard underline hover:text-sees-mint";
+  `relative z-10 -mx-1.5 -my-3 px-1.5 py-3 ${textLinkClassName}`;
 
 // The width comes from the parent's grid column. The whole card opens the project: the title's
 // link is stretched over the card with an ::after layer.

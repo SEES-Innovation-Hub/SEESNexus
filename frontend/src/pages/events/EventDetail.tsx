@@ -1,10 +1,12 @@
-import { ArrowLeft, CalendarDays, ExternalLink, MapPin, Pencil, RotateCcw, Trash, Users, Video } from "lucide-react";
+import { CalendarDays, ExternalLink, MapPin, Pencil, RotateCcw, Trash, Users, Video } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { errorMessage, isNotFoundError } from "../../api/client";
+import BackLink from "../../components/BackLink";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { buttonClassName } from "../../components/Button/buttonClassName";
+import { textLinkClassName } from "../../components/Button/textLinkClassName";
 import Card from "../../components/Card";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ErrorState from "../../components/ErrorState";
@@ -18,9 +20,6 @@ import { EVENT_TYPE_LABELS, eventWhen, formatDateTime, placesSummary } from "../
 import { isHttpUrl } from "../../utils/isHttpUrl";
 import { EventNotFound } from "./EventNotFound";
 import { RegistrationPanel } from "./RegistrationPanel";
-
-const backLinkClassName =
-  "-my-3 inline-flex items-center gap-1 py-3 text-sm text-sees-mustard hover:text-sees-mint";
 
 export function EventDetail() {
   const { id = "" } = useParams();
@@ -69,10 +68,7 @@ export function EventDetail() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PrefetchLink to="/events" className={backLinkClassName}>
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        All events
-      </PrefetchLink>
+      <BackLink to="/events">All events</BackLink>
 
       <Card as="article" padding="none" className="overflow-hidden">
         {event.banner_url && (
@@ -128,7 +124,7 @@ export function EventDetail() {
               {event.is_virtual && isHttpUrl(event.virtual_link) && (
                 <p className="text-sm wrap-anywhere text-white/60">
                   Meeting link:{" "}
-                  <a href={event.virtual_link} target="_blank" rel="noreferrer" className="text-sees-mustard underline hover:text-sees-mint">
+                  <a href={event.virtual_link} target="_blank" rel="noreferrer" className={textLinkClassName}>
                     {event.virtual_link}
                     <ExternalLink aria-hidden="true" className="ml-1 inline size-3" />
                   </a>

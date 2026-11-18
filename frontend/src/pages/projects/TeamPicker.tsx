@@ -47,7 +47,7 @@ export function TeamPicker({ value, onChange, lockedId }: TeamPickerProps) {
                 type="button"
                 onClick={() => onChange(value.filter((m) => m.id !== member.id))}
                 aria-label={`Remove ${member.full_name} from the team`}
-                className="inline-flex size-9 items-center justify-center rounded-full text-white/50 hover:text-white"
+                className="-my-1.5 -mr-1 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-white/50 hover:text-white"
               >
                 <X aria-hidden="true" className="size-4" />
               </button>

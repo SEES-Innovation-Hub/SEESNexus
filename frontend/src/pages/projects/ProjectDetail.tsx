@@ -1,8 +1,9 @@
-import { ArrowLeft, CodeXml, ExternalLink, Pencil, Trash } from "lucide-react";
+import { CodeXml, ExternalLink, Pencil, Trash } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { errorMessage, isNotFoundError } from "../../api/client";
 import Avatar from "../../components/Avatar";
+import BackLink from "../../components/BackLink";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { buttonClassName } from "../../components/Button/buttonClassName";
@@ -19,9 +20,6 @@ import { canEditProject } from "../../utils/canEditProject";
 import { isHttpUrl } from "../../utils/isHttpUrl";
 import { CATEGORY_LABELS, STATUS_LABELS } from "../../utils/projectLabels";
 import { ProjectNotFound } from "./ProjectNotFound";
-
-const backLinkClassName =
-  "-my-3 inline-flex items-center gap-1 py-3 text-sm text-sees-mustard hover:text-sees-mint";
 
 export function ProjectDetail() {
   const { id = "" } = useParams();
@@ -65,10 +63,7 @@ export function ProjectDetail() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PrefetchLink to="/projects" className={backLinkClassName}>
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        All projects
-      </PrefetchLink>
+      <BackLink to="/projects">All projects</BackLink>
 
       <Card as="article" padding="none" className="overflow-hidden">
         {project.thumbnail_url ? (

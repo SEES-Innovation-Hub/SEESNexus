@@ -70,7 +70,7 @@ export function AdminUsers() {
           {shown.length} of {users.length} shown
         </p>
       )}
-      {isError && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
+      {isError && !users && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
       {users && shown.length === 0 && <EmptyState title="No members found" message="Try another name or role." />}
       {shown.length > 0 && (
         <ul className="space-y-3">

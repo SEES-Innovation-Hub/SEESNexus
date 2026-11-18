@@ -2,6 +2,7 @@ import Badge from "../../components/Badge";
 import { buttonClassName } from "../../components/Button/buttonClassName";
 import Card from "../../components/Card";
 import ErrorState from "../../components/ErrorState";
+import SeeAllLink from "../../components/SeeAllLink";
 import PrefetchLink from "../../components/PrefetchLink";
 import Skeleton from "../../components/Skeleton";
 import { useMyLoans } from "../../hooks/useMyLoans";
@@ -18,17 +19,15 @@ export function DashboardLoans() {
 
   return (
     <section aria-labelledby="dashboard-loans-heading" className="space-y-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="dashboard-loans-heading" className="text-xl font-medium text-white">
           Your loans
         </h2>
-        <PrefetchLink to="/loans" className="-my-3 py-3 text-sm text-sees-mustard underline hover:text-sees-mint">
-          All my loans
-        </PrefetchLink>
+        <SeeAllLink to="/loans">All my loans</SeeAllLink>
       </div>
 
       {isPending && <Skeleton className="h-24 rounded-2xl" />}
-      {isError && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
+      {isError && !loans && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
       {loans && current.length === 0 && (
         <Card className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-sm text-white/60">Nothing borrowed or waiting for approval.</p>

@@ -39,7 +39,7 @@ export function OtpVerification({
   const isBusy = isVerifying || isSubmitting;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
       <Card padding="lg" className="w-full max-w-sm">
         <form onSubmit={handleSubmit} className="space-y-4">
           <h1 className="text-2xl font-semibold text-sees-mint">Verify your email</h1>
@@ -62,15 +62,11 @@ export function OtpVerification({
                 : "Verify"}
           </Button>
 
-          <button
-            type="button"
-            onClick={onBack}
-            className="w-full py-3 text-sm text-sees-mustard underline hover:text-sees-mint"
-          >
+          <Button variant="secondary" onClick={onBack} className="w-full">
             Back
-          </button>
+          </Button>
         </form>
       </Card>
-    </div>
+    </main>
   );
 }

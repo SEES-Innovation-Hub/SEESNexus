@@ -1,13 +1,12 @@
-import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { errorMessage, isNotFoundError } from "../../api/client";
+import BackLink from "../../components/BackLink";
 import Badge from "../../components/Badge";
 import Card from "../../components/Card";
 import Checkbox from "../../components/Checkbox";
 import EmptyState from "../../components/EmptyState";
 import ErrorState from "../../components/ErrorState";
-import PrefetchLink from "../../components/PrefetchLink";
 import Skeleton from "../../components/Skeleton";
 import StatTile from "../../components/StatTile";
 import { useSetAttendance } from "../../hooks/useEventActions";
@@ -102,13 +101,7 @@ export function EventParticipants() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PrefetchLink
-        to={`/events/${id}`}
-        className="-my-3 inline-flex items-center gap-1 py-3 text-sm text-sees-mustard hover:text-sees-mint"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Back to the event
-      </PrefetchLink>
+      <BackLink to={`/events/${id}`}>Back to the event</BackLink>
       <div>
         <h1 className="text-3xl font-semibold wrap-anywhere text-sees-mint">{event.data.title}</h1>
         <p className="mt-1 text-white/60">{eventWhen(event.data)}</p>

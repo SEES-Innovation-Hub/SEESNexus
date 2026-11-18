@@ -1,7 +1,7 @@
 export type ProjectStatus = "IDEATION" | "IN_PROGRESS" | "COMPLETED";
 export type ProjectCategory = "IOT" | "AI_ML" | "EMBEDDED" | "WEB" | "MOBILE";
 
-// Mirrors backend/app/schemas/project.py — keep in sync with the backend.
+// Mirrors backend/app/schemas/project.py. Keep in sync with the backend.
 export interface ProjectMember {
   id: string;
   full_name: string;

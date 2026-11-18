@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import * as authApi from "../../api/auth";
 import { errorMessage } from "../../api/client";
 import Button from "../../components/Button";
+import { textLinkClassName } from "../../components/Button/textLinkClassName";
 import Card from "../../components/Card";
 import PrefetchLink from "../../components/PrefetchLink";
 import TextField from "../../components/TextField";
@@ -62,7 +63,7 @@ export function ForgotPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
       <Card padding="lg" className="w-full max-w-sm">
         {step === "email" ? (
           <form onSubmit={requestCode} className="space-y-4">
@@ -79,7 +80,7 @@ export function ForgotPassword() {
             </Button>
             <p className="text-sm text-white/60">
               Remembered it?{" "}
-              <PrefetchLink to="/login" className="-my-3 inline-block py-3 text-sees-mustard underline hover:text-sees-mint">
+              <PrefetchLink to="/login" className={`-my-3 inline-block py-3 ${textLinkClassName}`}>
                 Log in
               </PrefetchLink>
             </p>
@@ -129,7 +130,7 @@ export function ForgotPassword() {
                 type="button"
                 onClick={() => void requestCode()}
                 disabled={isSubmitting}
-                className="-my-3 py-3 text-sees-mustard underline hover:text-sees-mint disabled:opacity-50"
+                className={`-my-3 py-3 ${textLinkClassName} disabled:opacity-50`}
               >
                 Send a new code
               </button>
@@ -147,6 +148,6 @@ export function ForgotPassword() {
           </form>
         )}
       </Card>
-    </div>
+    </main>
   );
 }

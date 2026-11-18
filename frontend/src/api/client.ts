@@ -25,7 +25,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Every endpoint replies with the {status, message, data} envelope — this
+// Every endpoint replies with the {status, message, data} envelope; this
 // pulls the payload out so callers work with plain types, not the wrapper.
 export async function unwrap<T>(
   request: Promise<AxiosResponse<Envelope<T>>>,
@@ -58,7 +58,7 @@ export function setSessionExpiredHandler(handler: () => void) {
 }
 
 // A 401 from one of these means "wrong credentials" / "bad code", never
-// "expired token" — they must never trigger a refresh attempt below.
+// "expired token", so they must never trigger a refresh attempt below.
 const UNAUTHENTICATED_PATHS = [
   "/auth/login",
   "/auth/register",
@@ -74,7 +74,7 @@ function isUnauthenticatedRequest(url?: string): boolean {
 
 // Only one refresh call is ever in flight. Any request that 401s while a
 // refresh is already running awaits this same promise instead of firing
-// its own — avoids a stampede of parallel refresh calls.
+// its own, which avoids a stampede of parallel refresh calls.
 let refreshPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {

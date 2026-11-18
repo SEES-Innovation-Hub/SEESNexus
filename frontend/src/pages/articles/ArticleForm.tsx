@@ -16,8 +16,8 @@ import {
 } from "./articleFormValues";
 
 const STATUS_OPTIONS: { value: ArticleStatus; label: string }[] = [
-  { value: "DRAFT", label: "Draft — only you and admins can see it" },
-  { value: "PUBLISHED", label: "Published — every member can read it" },
+  { value: "DRAFT", label: "Draft (only you and admins can see it)" },
+  { value: "PUBLISHED", label: "Published (every member can read it)" },
 ];
 
 interface ArticleFormProps {

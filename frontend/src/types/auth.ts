@@ -1,6 +1,6 @@
 export type UserRole = "STUDENT" | "CONTRIBUTOR" | "ADMIN";
 
-// Mirrors app/schemas/auth.py::UserPublic — keep in sync with the backend.
+// Mirrors app/schemas/auth.py::UserPublic. Keep in sync with the backend.
 export interface User {
   id: string;
   full_name: string;

@@ -1,20 +1,20 @@
 // Static marketing copy (from the project documentation's "Core Pillars"), not
-// backend data — there is nothing to fetch here.
+// backend data, so there is nothing to fetch here.
 const PILLARS = [
   {
     title: "Innovation Gallery",
     description:
-      "A showcase for student work, so projects become discoverable, memorable and shareable.",
+      "See what other students are building, and share your own projects with the society.",
   },
   {
     title: "Hardware Lab",
     description:
-      "See what equipment exists, who borrowed it and when it's due — less loss, faster checkout.",
+      "Check what the lab has, request what you need, and see when it's due back.",
   },
   {
     title: "Community & Events",
     description:
-      "Discover and register for hackathons, workshops and congresses in one place.",
+      "Find hackathons, workshops and congresses, and register for them here.",
   },
 ];
 
@@ -25,7 +25,7 @@ export function PillarsSection() {
       className="mx-auto w-full max-w-6xl px-6 py-16"
     >
       <h2 id="pillars-heading" className="text-3xl font-semibold text-sees-mint">
-        One platform, three pillars
+        What you can do here
       </h2>
       <ul className="mt-8 grid gap-5 md:grid-cols-3">
         {PILLARS.map((pillar) => (

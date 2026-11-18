@@ -17,7 +17,7 @@ export function CheckInForm({ eventId }: { eventId: string }) {
     checkIn.mutate(
       { eventId, code: code.trim() },
       {
-        onSuccess: () => showToast("You're checked in. Enjoy the event!"),
+        onSuccess: () => showToast("You're checked in."),
         onError: (error) => showToast(errorMessage(error, "Couldn't check you in. Try again."), "error"),
       },
     );

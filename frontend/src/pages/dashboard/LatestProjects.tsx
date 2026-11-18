@@ -1,5 +1,5 @@
 import ErrorState from "../../components/ErrorState";
-import PrefetchLink from "../../components/PrefetchLink";
+import SeeAllLink from "../../components/SeeAllLink";
 import ProjectCard from "../../components/ProjectCard";
 import Skeleton from "../../components/Skeleton";
 import { useProjectList } from "../../hooks/useProjectList";
@@ -12,13 +12,11 @@ export function LatestProjects() {
 
   return (
     <section aria-labelledby="latest-projects-heading" className="space-y-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="latest-projects-heading" className="text-xl font-medium text-white">
           Latest projects
         </h2>
-        <PrefetchLink to="/projects" className="-my-3 py-3 text-sm text-sees-mustard underline hover:text-sees-mint">
-          All projects
-        </PrefetchLink>
+        <SeeAllLink to="/projects">All projects</SeeAllLink>
       </div>
 
       {isPending && (
@@ -28,7 +26,7 @@ export function LatestProjects() {
           ))}
         </div>
       )}
-      {isError && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
+      {isError && !data && <ErrorState onRetry={() => void refetch()} isRetrying={isFetching} />}
       {data && data.items.length === 0 && (
         <p className="text-sm text-white/50">No projects yet. Be the first to share one.</p>
       )}

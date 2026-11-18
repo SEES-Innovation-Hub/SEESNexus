@@ -5,7 +5,7 @@ interface TeamMember {
   imageUrl?: string;
 }
 
-// PLACEHOLDER content — swap in the real names, roles and photos.
+// PLACEHOLDER content: swap in the real names, roles and photos.
 const TEAM: TeamMember[] = [
   { name: "John Doe", role: "Frontend Lead" },
   { name: "Doe John", role: "Backend Lead" },
@@ -67,7 +67,7 @@ export function TeamSection() {
       className="mx-auto w-full max-w-6xl px-6 py-16"
     >
       <h2 id="team-heading" className="text-3xl font-semibold text-sees-mint">
-        The people behind Sees Nexus
+        The team
       </h2>
       <ul className="mt-8 grid grid-cols-2 gap-5 md:grid-cols-4">
         {TEAM.map((member) => (

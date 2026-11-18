@@ -1,5 +1,6 @@
 import type { BadgeTone } from "../components/Badge";
 import type { EventType, RegistrationStatus, SeesEvent } from "../types/events";
+import { parseApiDate } from "./parseApiDate";
 
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   HACKATHON: "Hackathon",
@@ -30,23 +31,23 @@ export function isEventType(value: string | null): value is EventType {
   return value !== null && Object.hasOwn(EVENT_TYPE_LABELS, value);
 }
 
-// "Sat 14 Nov 2026, 10:00 – 16:00", or both dates when it runs over midnight.
+// "Sat 14 Nov 2026, 10:00 to 16:00", or both dates when it runs over midnight.
 export function eventWhen(event: Pick<SeesEvent, "start_date" | "end_date">): string {
-  const start = new Date(event.start_date);
-  const end = new Date(event.end_date);
+  const start = parseApiDate(event.start_date);
+  const end = parseApiDate(event.end_date);
   const day = (d: Date) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   return start.toDateString() === end.toDateString()
-    ? `${day(start)}, ${time(start)} – ${time(end)}`
-    : `${day(start)}, ${time(start)} – ${day(end)}, ${time(end)}`;
+    ? `${day(start)}, ${time(start)} to ${time(end)}`
+    : `${day(start)}, ${time(start)} to ${day(end)}, ${time(end)}`;
 }
 
 export function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return parseApiDate(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function hasStarted(event: Pick<SeesEvent, "start_date">, now = Date.now()): boolean {
-  return new Date(event.start_date).getTime() <= now;
+  return parseApiDate(event.start_date).getTime() <= now;
 }
 
 // Members can check in from an hour before the start until the end (the
@@ -54,13 +55,13 @@ export function hasStarted(event: Pick<SeesEvent, "start_date">, now = Date.now(
 const CHECKIN_OPENS_BEFORE_MS = 60 * 60 * 1000;
 export function inCheckInWindow(event: Pick<SeesEvent, "start_date" | "end_date">, now = Date.now()): boolean {
   return (
-    now >= new Date(event.start_date).getTime() - CHECKIN_OPENS_BEFORE_MS &&
-    now <= new Date(event.end_date).getTime()
+    now >= parseApiDate(event.start_date).getTime() - CHECKIN_OPENS_BEFORE_MS &&
+    now <= parseApiDate(event.end_date).getTime()
   );
 }
 
 export function registrationClosed(event: Pick<SeesEvent, "registration_deadline">, now = Date.now()): boolean {
-  return new Date(event.registration_deadline).getTime() < now;
+  return parseApiDate(event.registration_deadline).getTime() < now;
 }
 
 // "3 places left", "Full", "No limit".

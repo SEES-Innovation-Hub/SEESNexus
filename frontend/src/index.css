@@ -66,6 +66,104 @@
   color-scheme: dark;
 }
 
+/* Dropdown lists in the brand colours. Browsers that can style the open list
+   (Chrome and Edge 135+) get the full theme below; the rest keep their own menu,
+   with the colours set on <option>. Either way it stays a native <select>, so
+   keyboard, screen readers and forms work as before. */
+option {
+  background-color: var(--color-sees-forest);
+  color: white;
+}
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+  select::picker-icon {
+    color: var(--color-sees-mint);
+    transition: rotate 150ms;
+  }
+  select:open::picker-icon {
+    rotate: 180deg;
+  }
+  ::picker(select) {
+    margin-block: 4px;
+    padding: 4px;
+    border: 1px solid rgb(167 255 235 / 0.25);
+    border-radius: 0.75rem;
+    background-color: var(--color-sees-forest);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+  }
+  option {
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+    border-radius: 0.5rem;
+    color: rgb(255 255 255 / 0.8);
+  }
+  option:hover,
+  option:focus-visible {
+    background-color: var(--color-sees-teal);
+    color: var(--color-sees-mint);
+    outline: none;
+  }
+  option:checked {
+    color: var(--color-sees-mint);
+    font-weight: 500;
+  }
+  option::checkmark {
+    color: var(--color-sees-mint);
+  }
+}
+
+/* Dropdown lists in the brand colours. Browsers that can style the open list
+   (Chrome and Edge 135+) get the full theme below; the rest keep their own menu,
+   with the colours set on <option>. Either way it stays a native <select>, so
+   keyboard, screen readers and forms work as before. */
+option {
+  background-color: var(--color-sees-forest);
+  color: white;
+}
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+  select::picker-icon {
+    color: var(--color-sees-mint);
+    transition: rotate 150ms;
+  }
+  select:open::picker-icon {
+    rotate: 180deg;
+  }
+  ::picker(select) {
+    margin-block: 4px;
+    padding: 4px;
+    border: 1px solid rgb(167 255 235 / 0.25);
+    border-radius: 0.75rem;
+    background-color: var(--color-sees-forest);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+  }
+  option {
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+    border-radius: 0.5rem;
+    color: rgb(255 255 255 / 0.8);
+  }
+  option:hover,
+  option:focus-visible {
+    background-color: var(--color-sees-teal);
+    color: var(--color-sees-mint);
+    outline: none;
+  }
+  option:checked {
+    color: var(--color-sees-mint);
+    font-weight: 500;
+  }
+  option::checkmark {
+    color: var(--color-sees-mint);
+  }
+}
+
 /* Thin, quiet scrollbars in the brand colour everywhere (page, sidebar, lists),
    like shadcn's, instead of the browser's white/grey bar. scrollbar-color is
    inherited; scrollbar-width isn't, hence the universal selector. */

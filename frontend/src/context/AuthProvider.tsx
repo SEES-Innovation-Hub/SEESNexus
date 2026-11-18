@@ -7,7 +7,7 @@ import type { User, UserUpdatePayload } from "../types/auth";
 import { AuthContext } from "./AuthContext";
 
 // Cached API data can include one person's private records (their loans, the
-// admin's user list), so it is dropped whenever the signed-in user changes —
+// admin's user list), so it is dropped whenever the signed-in user changes:
 // the next person on a shared computer must never see it, even for a moment.
 function signOut(setUser: (user: User | null) => void) {
   queryClient.clear();
@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Syncs with things outside React on mount: restores a session from a token
   // already in browser storage, and subscribes to the API client's session-expiry
-  // signal — neither is derivable from props/state or triggered by a handler.
+  // signal; neither is derivable from props/state or triggered by a handler.
   useEffect(() => {
     setSessionExpiredHandler(() => signOut(setUser));
     if (tokenStore.getAccess() === null) return;
