@@ -749,3 +749,73 @@ async def test_retired_item_cannot_be_borrowed(
         f"{BASE}/{item.id}/loan", json={"purpose": "too late"}, headers=auth_header(student_token)
     )
     assert resp.status_code == 400
+
+
+# --- Withdrawing a pending request: PUT /hardware/loans/{id}/cancel ---
+
+
+async def test_student_can_withdraw_their_pending_request(
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str
+):
+    hardware = await seed_hardware(db_session, quantity=2)
+    loan = await seed_loan(db_session, hardware=hardware, borrower=student_user)
+
+    response = await client.put(f"{BASE}/loans/{loan.id}/cancel", headers=auth_header(student_token))
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "CANCELLED"
+
+    # A pending loan never held a unit, so the shelf is unchanged.
+    await db_session.refresh(hardware)
+    assert hardware.available_quantity == 2
+
+    # The withdrawn request stays in the student's history...
+    mine = await client.get(f"{BASE}/loans/my", headers=auth_header(student_token))
+    assert [row["status"] for row in mine.json()["data"]] == ["CANCELLED"]
+
+    # ...and no longer blocks a fresh request for the same item.
+    again = await client.post(
+        f"{BASE}/{hardware.id}/loan", json={"purpose": "Second try"}, headers=auth_header(student_token)
+    )
+    assert again.status_code == 201
+
+
+async def test_only_pending_requests_can_be_withdrawn(
+    client: AsyncClient, db_session: AsyncSession, student_user: User, student_token: str, admin_user: User
+):
+    hardware = await seed_hardware(db_session, quantity=2)
+    for state in (LoanStatus.APPROVED, LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED):
+        loan = await seed_loan(
+            db_session, hardware=hardware, borrower=student_user, status=state, approved_by_id=admin_user.id
+        )
+        response = await client.put(
+            f"{BASE}/loans/{loan.id}/cancel", headers=auth_header(student_token)
+        )
+        assert response.status_code == 400, state
+        await db_session.refresh(loan)
+        assert loan.status is state
+
+
+async def test_cannot_withdraw_someone_elses_request(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    student_user: User,
+    other_student_token: str,
+    admin_token: str,
+):
+    hardware = await seed_hardware(db_session)
+    loan = await seed_loan(db_session, hardware=hardware, borrower=student_user)
+
+    assert (
+        await client.put(f"{BASE}/loans/{loan.id}/cancel", headers=auth_header(other_student_token))
+    ).status_code == 403
+    # Admins reject; they do not withdraw on a student's behalf.
+    assert (
+        await client.put(f"{BASE}/loans/{loan.id}/cancel", headers=auth_header(admin_token))
+    ).status_code == 403
+    assert (await client.put(f"{BASE}/loans/{loan.id}/cancel")).status_code == 401
+    assert (
+        await client.put(f"{BASE}/loans/missing/cancel", headers=auth_header(other_student_token))
+    ).status_code == 404
+
+    await db_session.refresh(loan)
+    assert loan.status is LoanStatus.PENDING

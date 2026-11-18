@@ -42,6 +42,9 @@ class LoanStatus(str, enum.Enum):
     APPROVED = "APPROVED"
     RETURNED = "RETURNED"
     REJECTED = "REJECTED"
+    # Withdrawn by the borrower while still PENDING. Kept distinct from REJECTED
+    # so the admin queue and the student's history say who closed the request.
+    CANCELLED = "CANCELLED"
 
 
 class HardwareLoan(Base):

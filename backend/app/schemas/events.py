@@ -64,6 +64,10 @@ class EventResponse(BaseModel):
     max_participants: int | None
     created_by_id: str
     created_at: datetime
+    # Always null on events served to students: they only ever see live events.
+    # Set when an admin views a deleted event (GET /events?deleted=true, or
+    # GET /events/{id}), which is how the app offers "restore".
+    deleted_at: datetime | None = None
 
     # Filled by _event_response() in api/v1/events.py, which is the only place
     # allowed to build this model: the counts come from the registrations, not
@@ -83,6 +87,16 @@ class EventRegistrationResponse(BaseModel):
     student_id: str
     status: RegistrationStatus
     registered_at: datetime
+
+
+class MyRegistrationResponse(EventRegistrationResponse):
+    """One row of GET /events/registrations/my: the registration plus its event."""
+
+    # 1 = next in line. Null unless status is WAITLISTED.
+    waitlist_position: int | None = None
+    # The organisers deleted the event after the student registered.
+    event_deleted: bool = False
+    event: EventResponse
 
 
 class EventParticipantResponse(EventRegistrationResponse):
