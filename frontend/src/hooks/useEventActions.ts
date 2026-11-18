@@ -21,9 +21,11 @@ function useEventMutation<TVariables, TResult>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
+    // Returned, so the action only counts as finished once the screens show the
+    // new state: no flicker back to the old value between "saved" and "refreshed".
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.events.all });
       if (affectsStats) void queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
+      return queryClient.invalidateQueries({ queryKey: queryKeys.events.all });
     },
   });
 }

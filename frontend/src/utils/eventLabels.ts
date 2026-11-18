@@ -57,5 +57,5 @@ export function registrationClosed(event: Pick<SeesEvent, "registration_deadline
 export function placesSummary(event: SeesEvent): string {
   if (event.spots_left === null) return `${event.confirmed_count} going · no limit`;
   if (event.spots_left === 0) return `Full · ${event.confirmed_count} going`;
-  return `${event.spots_left} of ${event.max_participants} ${event.spots_left === 1 ? "place" : "places"} left`;
+  return `${event.spots_left} of ${event.max_participants} places left`;
 }

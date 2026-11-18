@@ -109,7 +109,7 @@ export function EventDetail() {
               )}
               <span className="wrap-anywhere">
                 {event.location}
-                {event.is_virtual && " · online"}
+                {event.is_virtual && !/online/i.test(event.location) && " · online"}
               </span>
             </li>
             <li className="flex gap-2">

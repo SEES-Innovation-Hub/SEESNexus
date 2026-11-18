@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { errorMessage, isNotFoundError } from "../../api/client";
 import Badge from "../../components/Badge";
@@ -26,12 +27,17 @@ const STATUS_LABELS = { CONFIRMED: "Confirmed", WAITLISTED: "Waitlisted", CANCEL
 function ParticipantRow({ eventId, participant }: { eventId: string; participant: Participant }) {
   const { showToast } = useToast();
   const setAttendance = useSetAttendance();
-  const attended = participant.attended_at !== null;
+  // What was just clicked, shown until the save settles, so the box ticks the
+  // moment it's clicked instead of after the request and the list refresh.
+  const [clicked, setClicked] = useState<boolean | null>(null);
+  const attended = clicked ?? participant.attended_at !== null;
 
   function toggle(next: boolean) {
+    setClicked(next);
     setAttendance.mutate(
       { eventId, registrationId: participant.id, attended: next },
       {
+        onSettled: () => setClicked(null),
         onError: (error) =>
           showToast(errorMessage(error, `Couldn't update ${participant.student_name}'s attendance.`), "error"),
       },

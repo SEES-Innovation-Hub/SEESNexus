@@ -73,18 +73,19 @@ export function RegistrationPanel({ event }: { event: SeesEvent }) {
             )}
           </div>
 
-          {registration.status === "CONFIRMED" && event.is_virtual && isHttpUrl(event.virtual_link) && (
-            <a href={event.virtual_link} target="_blank" rel="noreferrer" className={buttonClassName()}>
-              <ExternalLink aria-hidden="true" className="size-4" />
-              Join the meeting
-            </a>
-          )}
-
-          {!started && (
-            <Button variant="secondary" onClick={() => setConfirmingCancel(true)}>
-              Cancel my registration
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-3">
+            {registration.status === "CONFIRMED" && event.is_virtual && isHttpUrl(event.virtual_link) && (
+              <a href={event.virtual_link} target="_blank" rel="noreferrer" className={buttonClassName()}>
+                <ExternalLink aria-hidden="true" className="size-4" />
+                Join the meeting
+              </a>
+            )}
+            {!started && (
+              <Button variant="secondary" onClick={() => setConfirmingCancel(true)}>
+                Cancel my registration
+              </Button>
+            )}
+          </div>
         </div>
       ) : started ? (
         <p className="text-sm text-white/60">This event has already started.</p>
