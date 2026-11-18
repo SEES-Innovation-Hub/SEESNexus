@@ -28,7 +28,7 @@ export default function ImageGenerator({ defaultTopic = '', onUploaded, onUpload
   const [error, setError] = useState<string | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
 
-  // An object URL keeps the image bytes in memory until revoked — an external
+  // An object URL keeps the image bytes in memory until revoked: an external
   // resource, so its cleanup can't live in a handler (it must also run on unmount).
   useEffect(() => {
     return () => {
@@ -46,7 +46,7 @@ export default function ImageGenerator({ defaultTopic = '', onUploaded, onUpload
       const file = await generateImage(topic, AbortSignal.any([controller.signal, timeout]))
       setImage({ file, previewUrl: URL.createObjectURL(file) })
     } catch {
-      if (controller.signal.aborted) return // the author cancelled — nothing to report
+      if (controller.signal.aborted) return // the author cancelled, so there's nothing to report
       setError(
         timeout.aborted
           ? 'The image took too long to generate. Try again.'

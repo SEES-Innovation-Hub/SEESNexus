@@ -77,7 +77,7 @@ export function Register() {
     }
   }
 
-  // Step 2: the code is already verified by OtpVerification itself — this just
+  // Step 2: the code is already verified by OtpVerification itself; this just
   // creates the account and logs the user straight in, so registration ends
   // on an authenticated session instead of a second login form. Verifying
   // uses the code up, so a failure here goes back to the details step (with
@@ -115,7 +115,7 @@ export function Register() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
       <Card padding="lg" className="w-full max-w-sm">
         <form onSubmit={handleDetailsSubmit} className="space-y-4">
           <h1 className="text-2xl font-semibold text-sees-mint">
@@ -186,6 +186,6 @@ export function Register() {
           </Button>
         </form>
       </Card>
-    </div>
+    </main>
   );
 }

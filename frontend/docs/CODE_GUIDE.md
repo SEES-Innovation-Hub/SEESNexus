@@ -151,6 +151,8 @@ export const pageLoaders = {
 ```
 `App.tsx` renders them through `React.lazy`, and `prefetchPages()` calls the **same** imports early so the browser already has the code when the route opens. Three things trigger it: `usePrefetchAuthPages` (browser idle after Landing loads, skipped on data saver), `PrefetchLink` (hover / touch / focus), and the login/register submit handlers (start the Profile download while the request runs).
 
+- **The opened page starts downloading at startup:** `main.tsx` calls `prefetchPageForPath(location.pathname)` before the first render, so the sidebar layout and the page's code download while the login is checked, not after it.
+
 ### 3.4 Loading data from the API (TanStack Query)
 Every API **read** a page needs on load goes through TanStack Query's `useQuery`, wrapped in a hook under `src/hooks/`. It sits on top of our axios functions; it does not replace them.
 
@@ -352,6 +354,8 @@ The team rule is "justify every effect". There are exactly five, each with a com
 Everything else (form state, edit/view toggles, upload state) is plain state and event handlers.
 
 ## 5. Conventions we followed
+
+- **Plain wording, no long dashes.** Text people see uses commas, colons or brackets instead of "—" or "–", and date ranges say "to". Keep it short and specific: no "seamless", "unlock" or exclamation-mark cheerfulness in toasts.
 
 - **Links have three looks, so nothing reads like a footnote:**
   - **`BackLink`** is "← All projects" above a detail page.

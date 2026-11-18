@@ -31,7 +31,7 @@ export function ProfileEditForm({ user, onDone }: ProfileEditFormProps) {
       return;
     }
 
-    // Only changed fields are sent — PUT /auth/me applies exactly what it gets.
+    // Only changed fields are sent: PUT /auth/me applies exactly what it gets.
     const changes: UserUpdatePayload = {};
     if (fullName.trim() !== user.full_name) changes.full_name = fullName.trim();
     if (department.trim() !== user.department) changes.department = department.trim();

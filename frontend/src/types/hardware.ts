@@ -1,4 +1,4 @@
-// Mirrors backend/app/schemas/hardware.py and models/hardware.py — keep in sync.
+// Mirrors backend/app/schemas/hardware.py and models/hardware.py. Keep in sync.
 export type HardwareCategory = "MEASUREMENT" | "MICROCONTROLLER" | "COMPONENT";
 export type HardwareStatus = "AVAILABLE" | "BORROWED" | "MAINTENANCE";
 // CANCELLED: the borrower withdrew the request before an admin decided.

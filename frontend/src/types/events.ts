@@ -1,4 +1,4 @@
-// Mirrors backend/app/schemas/events.py and models/events.py — keep in sync.
+// Mirrors backend/app/schemas/events.py and models/events.py. Keep in sync.
 export type EventType = "HACKATHON" | "WORKSHOP" | "SEMINAR" | "CONFERENCE" | "ORIENTATION";
 export type RegistrationStatus = "CONFIRMED" | "WAITLISTED" | "CANCELLED";
 

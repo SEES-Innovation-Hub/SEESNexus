@@ -63,7 +63,7 @@ export function ForgotPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
       <Card padding="lg" className="w-full max-w-sm">
         {step === "email" ? (
           <form onSubmit={requestCode} className="space-y-4">
@@ -148,6 +148,6 @@ export function ForgotPassword() {
           </form>
         )}
       </Card>
-    </div>
+    </main>
   );
 }

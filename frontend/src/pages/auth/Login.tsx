@@ -50,7 +50,7 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+    <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
       <Card padding="lg" className="w-full max-w-sm">
         <form onSubmit={handleSubmit} className="space-y-4">
           <h1 className="text-2xl font-semibold text-sees-mint">Log in</h1>
@@ -101,6 +101,6 @@ export function Login() {
           </p>
         </form>
       </Card>
-    </div>
+    </main>
   );
 }

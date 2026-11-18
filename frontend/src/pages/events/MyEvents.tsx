@@ -25,12 +25,12 @@ function RegistrationRow({ registration }: { registration: MyRegistration }) {
         ) : (
           <PrefetchLink
             to={`/events/${event.id}`}
-            className="-my-1 block py-1 font-medium wrap-anywhere text-white hover:text-sees-mint"
+            className="-my-2.5 block py-2.5 font-medium wrap-anywhere text-white hover:text-sees-mint"
           >
             {event.title}
           </PrefetchLink>
         )}
-        <p className="text-xs text-white/50">
+        <p className="text-xs wrap-anywhere text-white/50">
           {EVENT_TYPE_LABELS[event.event_type]} · {eventWhen(event)} · {event.location}
         </p>
       </div>

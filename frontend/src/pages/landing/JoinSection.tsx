@@ -13,8 +13,8 @@ export function JoinSection() {
           Join SEES Nexus
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-white/70">
-          Create an account to be part of the community's projects, hardware lab
-          and events.
+          Sign up with your email to share projects, borrow equipment and register
+          for events.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <PrefetchLink to="/register" className={buttonClassName("primary", "", "lg")}>

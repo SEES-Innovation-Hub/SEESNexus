@@ -31,15 +31,15 @@ export function isEventType(value: string | null): value is EventType {
   return value !== null && Object.hasOwn(EVENT_TYPE_LABELS, value);
 }
 
-// "Sat 14 Nov 2026, 10:00 – 16:00", or both dates when it runs over midnight.
+// "Sat 14 Nov 2026, 10:00 to 16:00", or both dates when it runs over midnight.
 export function eventWhen(event: Pick<SeesEvent, "start_date" | "end_date">): string {
   const start = parseApiDate(event.start_date);
   const end = parseApiDate(event.end_date);
   const day = (d: Date) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   return start.toDateString() === end.toDateString()
-    ? `${day(start)}, ${time(start)} – ${time(end)}`
-    : `${day(start)}, ${time(start)} – ${day(end)}, ${time(end)}`;
+    ? `${day(start)}, ${time(start)} to ${time(end)}`
+    : `${day(start)}, ${time(start)} to ${day(end)}, ${time(end)}`;
 }
 
 export function formatDateTime(value: string): string {

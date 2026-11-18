@@ -1,4 +1,4 @@
-// Mirrors backend/app/schemas/admin.py — keep in sync with the backend.
+// Mirrors backend/app/schemas/admin.py. Keep in sync with the backend.
 export interface DashboardStats {
   total_users: number;
   active_users: number;

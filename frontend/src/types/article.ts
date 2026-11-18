@@ -1,4 +1,4 @@
-// Mirrors backend/app/schemas/article.py — keep in sync.
+// Mirrors backend/app/schemas/article.py. Keep in sync.
 export type ArticleStatus = "DRAFT" | "PUBLISHED";
 
 export interface ArticleAuthor {

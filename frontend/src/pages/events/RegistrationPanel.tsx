@@ -38,7 +38,7 @@ export function RegistrationPanel({ event }: { event: SeesEvent }) {
       onSuccess: (result) =>
         showToast(
           result.status === "CONFIRMED"
-            ? "You're registered. See you there!"
+            ? "You're registered."
             : "The event is full, so you're on the waitlist. We'll email you if a place opens up.",
         ),
       onError: (error) => showToast(errorMessage(error, "Couldn't register. Try again."), "error"),
