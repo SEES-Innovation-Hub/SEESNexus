@@ -38,6 +38,17 @@ export interface Loan {
   actual_return_date: string | null;
 }
 
+// POST /hardware and PUT /hardware/:id (admin). available_quantity is never
+// sent: the backend derives it, and moves it with any change to quantity.
+export interface HardwarePayload {
+  name: string;
+  serial_number: string;
+  category: HardwareCategory;
+  quantity: number;
+  description: string | null;
+  status?: HardwareStatus;
+}
+
 // POST /hardware/:id/loan (LoanCreateRequest).
 export interface LoanRequestPayload {
   purpose: string;

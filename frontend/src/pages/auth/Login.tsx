@@ -25,7 +25,8 @@ export function Login() {
     setError(null);
     setIsSubmitting(true);
     // Overlaps the next page's download with the login request instead of waiting for it.
-    prefetchPageForPath(returnPath ?? "/projects");
+    // Most people land on their Dashboard (admins on /admin, fetched on arrival).
+    prefetchPageForPath(returnPath ?? "/dashboard");
     try {
       const loggedInUser = await login(email, password);
       navigate(returnPath ?? redirectPathForRole(loggedInUser.role), { replace: true });

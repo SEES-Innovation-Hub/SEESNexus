@@ -4,7 +4,6 @@ import { JoinSection } from "./JoinSection";
 import { LandingFooter } from "./LandingFooter";
 import { LandingNav } from "./LandingNav";
 import { PillarsSection } from "./PillarsSection";
-import { ProjectShowcaseRail } from "./ProjectShowcaseRail";
 import { TeamSection } from "./TeamSection";
 
 export function Landing() {
@@ -15,7 +14,6 @@ export function Landing() {
       <LandingNav />
       <main className="flex-1">
         <HeroSection />
-        <ProjectShowcaseRail />
         <PillarsSection />
         <TeamSection />
         <JoinSection />

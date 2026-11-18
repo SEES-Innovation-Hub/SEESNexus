@@ -96,7 +96,7 @@ export function ProjectDetail() {
               <Badge tone="mint">{CATEGORY_LABELS[project.category]}</Badge>
               <Badge tone="mustard">{STATUS_LABELS[project.status]}</Badge>
             </div>
-            <h1 className="text-3xl font-semibold wrap-anywhere text-white">{project.title}</h1>
+            <h1 className="text-2xl font-semibold wrap-anywhere text-white sm:text-3xl">{project.title}</h1>
             <p className="text-sm text-white/50">
               Added {new Date(project.created_at).toLocaleDateString(undefined, { dateStyle: "long" })}
             </p>

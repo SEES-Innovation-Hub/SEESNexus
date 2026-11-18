@@ -41,14 +41,16 @@ src/
   api/
     client.ts                  the shared Axios instance, interceptors, unwrap(), errorMessage(), isNotFoundError()
     auth.ts                    login, register, sendCode, verifyCode, getMe, updateMe
-    projects.ts                listProjects, getProject (public); createProject, updateProject, deleteProject
-    hardware.ts                listHardware, getHardware (public); requestLoan, listMyLoans, returnLoan
+    projects.ts                listProjects, getProject, createProject, updateProject, deleteProject
+    hardware.ts                listHardware, getHardware; requestLoan, listMyLoans (no self-return, §3.13);
+                               createHardware, updateHardware, retireHardware (admin)
+    admin.ts                   getAdminStats, listUsers, changeUserRole, deactivateUser, listAllLoans, approveLoan, rejectLoan
     queryClient.ts             the shared TanStack Query cache and its defaults
     queryKeys.ts               the name of every cached API read (used to refresh lists after changes)
     tokenStore.ts              the only code that reads/writes the session tokens (memory fallback if storage is blocked)
     upload.ts                  uploadImage (assumed /upload/image contract)
     imageGeneration.ts         generateImage (calls the image service directly)
-  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, envelope)
+  types/                       hand-written types mirroring the backend schemas (auth, project, hardware, admin, envelope)
   context/
     AuthContext.ts             the context + its value type
     AuthProvider.tsx           session state and actions (login, logout, updateProfile)
@@ -56,7 +58,6 @@ src/
   hooks/
     useAuth.ts                 the only way components read the session
     useLogout.ts               what every "Log out" button calls (§3.2)
-    useShowcaseProjects.ts     Landing's rail (useQuery + a remembered copy, §3.5)
     useProjectList.ts          a page of projects with filters (Projects page)
     useProject.ts              one project (shows a list's copy instantly, §3.12)
     useCreateProject.ts / useUpdateProject.ts / useDeleteProject.ts   changes; each refreshes the lists
@@ -64,16 +65,21 @@ src/
     useHardwareList.ts         a page of hardware with filters
     useMyLoans.ts              the signed-in person's loans (off for visitors)
     useHardwareNames.ts        names of the items loans point to (temporary, §3.13)
-    useRequestLoan.ts / useReturnLoan.ts   loan actions
+    useRequestLoan.ts          the loan request action
+    useAdminStats.ts / useAdminLoans.ts / useAdminUsers.ts   admin reads
+    useAdminLoanList.ts        all loans joined with borrower (user list) and item names
+    useApproveLoan.ts / useRejectLoan.ts   admin decisions
+    useChangeUserRole.ts / useDeactivateUser.ts   member management
+    useCreateHardware.ts / useUpdateHardware.ts / useRetireHardware.ts   inventory management
     usePrefetchAuthPages.ts    idle prefetch of the auth pages
     useToast.ts                the only way components show a toast
     useModalDialog.ts          opens/closes a native <dialog> as a modal (Modal + the phone drawer)
   components/                  shared UI, one folder each, default export from index.tsx
     Button/ (+ buttonClassName.ts)  Card/  Badge/  Spinner/  Skeleton/  EmptyState/  ErrorState/
     Pagination/  Modal/  ConfirmDialog/  Field/ (+ fieldStyles.ts)  TextField/  TextArea/  Select/
-    Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/   (see §3.10)
+    Avatar/  ProtectedRoute/  GuestRoute/  AdminRoute/  PrefetchLink/  ImageGenerator/  ProjectCard/  StatTile/   (see §3.10)
   pages/                       one folder per route-level feature, named exports
-    landing/   Landing, LandingNav, HeroSection, ProjectShowcaseRail,
+    landing/   Landing, LandingNav, HeroSection,
                PillarsSection, TeamSection, JoinSection, LandingFooter
     auth/      Login, Register, OtpVerification
     profile/   Profile, ProfileDetails, ProfileEditForm, ProfileAvatar
@@ -81,10 +87,13 @@ src/
                ProjectNotFound, projectFormValues (values, limits, validation)
     hardware/  HardwareList, HardwareCard, LoanRequestModal, cardActionId
     loans/     MyLoans, LoanCard
+    dashboard/ Dashboard, DashboardLoans, LatestProjects
+    admin/     AdminOverview, AdminLoans, AdminLoanCard, AdminUsers, UserRow,
+               AdminHardware, AdminHardwareRow, HardwareFormModal, hardwareFormValues
     notfound/  NotFound
     dev/       ImageGeneratorPreview, ComponentsPreview  (temporary sandboxes, dev builds only)
   utils/       redirectPathForRole, projectLabels, hardwareLabels (labels, select options, badge tones, URL checks),
-               isHttpUrl, canEditProject, returnPath
+               isHttpUrl, canEditProject, returnPath, isOverdue, loanDates, waitingQueue, userLabels
 public/        favicon, icons, robots.txt
 docs/          this guide and the decision log
 ```
@@ -108,7 +117,7 @@ Errors: `errorMessage(error, "fallback text")` returns the backend's own message
 
 ### 3.2 The session (`AuthProvider` + `client.ts`)
 - **On app start**, if a token is stored (read through `tokenStore`), `AuthProvider` calls `GET /auth/me`. While that runs `isLoading` is true, so `ProtectedRoute` waits instead of redirecting a signed-in user.
-- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. It goes to the page the person wanted (`returnPath`, see §3.11) or else their home, `redirectPathForRole` (Projects for every role until the Phase 3 Dashboard).
+- **Login** stores both tokens, then calls `/auth/me` and puts the user in state. It goes to the page the person wanted (`returnPath`, see §3.11) or else their home, `redirectPathForRole` (`/dashboard` for members, `/admin` for admins).
 - **Who sees what:** visitors get only Landing, `/login` and `/register`. `GuestRoute` sends a signed-in member away from those three to their home, so they never see Landing again until they log out. Every app page sits inside one `ProtectedRoute`.
 - **Log out** (`useLogout()`) clears the tokens and records the page it was pressed on (`loggedOutAt` = that page's `location.key`). `ProtectedRoute` sends exactly that page to Landing. Any later visit to an app page (a showcase card, Back) goes to login as usual. Keying it to one history entry, rather than a flag that stays on, is what stops "after logging out, clicking a project bounces back to Landing".
 - **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
@@ -145,15 +154,8 @@ What we get for free: one request even if two components ask for the same data, 
 - **On login, logout and session expiry** `AuthProvider` empties the whole cache, so one person's private data (their loans, the admin's user list) never shows to the next person on a shared computer.
 - The signed-in user is **not** in the query cache; it stays in `AuthProvider` (§3.2).
 
-### 3.5 The project rail (`useShowcaseProjects`)
-```
-first render:  readCache() ── found & fresh (≤ 7 days)? ─► show those cards immediately (marked stale)
-                        └── else ► skeleton
-at once:       useQuery → GET /projects?page_size=12
-                 ├─ success ► show fresh list + write it to the cache
-                 └─ failure ► keep cached cards if we have them, otherwise the error state
-```
-The saved copy is handed to `useQuery` as `initialData` with its real save time, so it is shown instantly but refreshed straight away. The cache key is `sees.projects.v2.<pageSize>`. Bump the version if the `Project` type changes. Landing's rail shows four states: loading skeleton, error, empty, data.
+### 3.5 Landing has no project preview
+The backend requires login for `GET /projects`, so Landing no longer shows projects. Members browse them at `/projects`.
 
 ### 3.6 The AI image generator (`ImageGenerator`)
 `topic → generateImage()` (image service) → preview from an object URL → **Use this image** → `uploadImage()` (`/upload/image`) → `onUploaded(url)` to the host form, which stores it as the project's `thumbnail_url`. It can be cancelled, times out after 90 s, keeps the previous preview when a new attempt fails, and revokes its object URLs when replaced or unmounted.
@@ -167,7 +169,7 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 ```
 - `verify-code` **uses the code up**, and `register` only accepts an already-used code. That is why a failure at the register step sends the user back to the details form to request a fresh code, instead of leaving them on the OTP screen.
 - `Register` owns the state (`details`, `step`, `error`, `isSubmitting`); `OtpVerification` only shows the second screen.
-- **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate by role (ADMIN to `/admin`, everyone else to `/profile`).
+- **Login** calls `login(email, password)` from `useAuth()`: the provider stores both tokens, calls `/auth/me`, and returns the user so the page can navigate: to the page they wanted, or their home (`/admin` for admins, `/dashboard` for everyone else).
 - Both the login submit and the register "code verified" handler call `prefetchPages("profile")` first, so the Profile code downloads while the request runs.
 
 ### 3.8 Profile view and edit
@@ -176,7 +178,7 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 - `ProfileAvatar`: pick a file, `uploadImage(file)` returns a URL, then `updateProfile({ profile_image_url })`. A failed upload shows a message and leaves the current photo.
 
 ### 3.9 How Landing is put together
-`Landing` only composes: `LandingNav`, then in `<main>` `HeroSection`, `ProjectShowcaseRail`, `PillarsSection`, `TeamSection`, `JoinSection`, and `LandingFooter`. The nav, hero, join banner and footer are **auth-aware** (`useAuth()`): signed-out visitors see Log in / Register / Get started, signed-in users see Profile links and no join banner, and nothing is shown while the session is still being restored.
+`Landing` only composes: `LandingNav`, then in `<main>` `HeroSection`, `PillarsSection`, `TeamSection`, `JoinSection`, and `LandingFooter`. Only visitors see it (`GuestRoute` sends members into the app), and it makes no API calls: the backend requires login for projects and hardware.
 
 | Element | Phone (under 768px) | Tablet and up |
 |---|---|---|
@@ -207,6 +209,7 @@ All in `src/components/`, one folder each, default export. See every one of them
 | `Avatar` | A person's photo or initial | `name`, `imageUrl`, `size` (px). Decorative: put the name next to it. |
 | `AdminRoute` | Wrapping admin-only pages | Not signed in → `/login`; not an admin → their own start page. The backend enforces the real rule. |
 | `ProjectCard` | A project in a list | The whole card links to the project; the parent sets its width (rail: fixed, Projects page: grid column). |
+| `StatTile` | One headline number | `label`, `value` (compact: 12.9K), optional `detail` and `to` (whole tile links). Numbers always come from the API. |
 | `useToast().showToast(msg, tone?)` | Short feedback after an action | `"success"` (default) or `"error"`; fades after 5 s, max 3 at once. |
 
 ### 3.11 The signed-in layout (sidebar)
@@ -254,16 +257,34 @@ AppLayout
 | Route | Who | Page |
 |---|---|---|
 | `/hardware` | signed in | `HardwareList`: category/availability filters, 12 per page; "Request loan" opens `LoanRequestModal` |
-| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected) |
+| `/loans` | signed in | `MyLoans`: "Current" (pending, on loan) and "History" (returned, rejected). No return button: see below |
 
 - **Shared list filters:** `useUrlFilters()` gives `page`, `read(name, guard)` (a value only counts if the guard recognises it), `setFilter` (returns to page 1), `setPage` (scrolls to the top) and `clearAll`. Projects and Hardware both use it.
 - **The card's action matches what the backend would allow:** your pending/approved loan → a link to My Loans. Under maintenance or none left → the reason. Otherwise "Request loan". The backend refuses duplicates, maintenance items and empty shelves, so nobody fills in a request that's bound to fail.
-- **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once. `useReturnLoan` refreshes My Loans and the hardware lists.
+- **Units only move on approval** (backend rule): a request doesn't change the shelf, so `useRequestLoan` just adds the returned loan to the My Loans cache. That updates the card at once.
+- **Students can't mark a loan returned.** The backend's `PUT /hardware/loans/:id/return` lets the *borrower* close a loan, so anyone could "return" something still in their bag and free up a unit that isn't on the shelf. The website doesn't use it. An approved loan shows "Bring it back to the lab. An admin will check it in." Returns will be confirmed by an admin, once the backend has an admin return endpoint (DECISIONS open item 20).
 - **Focus after a request:** the card's button is replaced by a link, so the dialog can't return focus to it. `HardwareList` focuses the new link (`cardActionId`) two frames after closing. Cancelling still returns focus to the button the normal way.
 - **Return date:** optional, can't be before tomorrow, sent as the end of that day in the borrower's time zone.
 - **Loan names are a stopgap:** loans only carry `hardware_id`, so `useHardwareNames` fetches each distinct item once (cached for an hour). Remove it when the backend includes the name (DECISIONS open item 16).
 - **Overdue:** an approved loan past its due date gets a red "Overdue" badge.
 - **Not here:** adding, editing or retiring hardware and approving or rejecting loans are admin pages (Phase 3). There's no "cancel my request" endpoint.
+
+### 3.14 Dashboard and admin
+| Route | Who | Page |
+|---|---|---|
+| `/dashboard` | members (their home) | Greeting, quick actions, `DashboardLoans` (current loans, overdue first), `LatestProjects` (3 newest). Each section loads on its own. |
+| `/admin` | admins (their home) | `AdminOverview`: four `StatTile`s from `GET /admin/dashboard`, then the 3 oldest waiting requests |
+| `/admin/loans` | admins | `AdminLoans`: Waiting / On loan / History / All (`?view=` in the URL), each loan as `AdminLoanCard` |
+| `/admin/users` | admins | `AdminUsers`: search (name, email, department) and role filter, each member as `UserRow` |
+| `/admin/hardware` | admins | `AdminHardware`: inventory with filters and paging; Add/Edit in `HardwareFormModal`; Retire / Back in service per `AdminHardwareRow` |
+
+- **Admin pages** sit in one nested route wrapped in `AdminRoute` (`<AdminRoute><Outlet/></AdminRoute>`). Students who open them are sent to their Dashboard. Each admin page is its own chunk, so students never download it.
+- **Who and what:** a loan carries only ids, so `useAdminLoanList` joins it with `/admin/users` (borrower name, email, department, level) and `useHardwareNames` (item name).
+- **Order:** waiting requests oldest first (`waitingQueue`, first come, first served), loans out now overdue first, history newest first.
+- **Decisions:** Approve needs no confirmation; Reject asks first. A failed approval (e.g. "No units available to lend" when the last unit already went out) is shown as an error toast and the request stays in the queue. After any decision the loans, the stats and (for approvals) hardware availability refresh.
+- **Members:** the backend sends every account (no paging/search), so search and the role filter run in the browser, in local state (typing into the URL would add a history entry per keystroke). Changing a role picks it in the dropdown, then asks for confirmation (with a warning when making someone an admin). Deactivating warns it can't be undone from the website yet. **The admin's own row has no controls**, because the backend doesn't stop admins demoting or deactivating themselves. Deactivated members show a badge and lose their controls.
+- **Inventory:** the form validates against the backend limits. Quantity can't go below the units out on loan (the form says how many). Backend errors such as a duplicate serial number appear inside the form. **Retire** is the backend's soft delete (status MAINTENANCE, history kept), so it can be undone: **Back in service** sets the status the stock implies (AVAILABLE, or BORROWED if every unit is out). There's no status field in the form; those two buttons are the only way to change it.
+- **Sidebar:** "Admin" group (Overview, Loan requests, Members, Inventory) for admins only. Overview uses `exact` so it isn't highlighted on `/admin/loans`.
 
 ## 4. Every `useEffect` and why it exists
 
@@ -286,7 +307,9 @@ Everything else (form state, edit/view toggles, upload state) is plain state and
 - **Use the shared components** (§3.10) instead of re-typing their classes: no hand-written button, card or input styles in pages.
 - **Helpers live in their own `.ts` file** (`buttonClassName.ts`, `fieldStyles.ts`), not in a component file; React's fast refresh (and our lint rule) needs component files to export only components.
 - **Named exports for pages**, default exports for shared components.
-- **Responsive by default:** mobile-first Tailwind classes, breakpoints at `md` (768px); tap targets at least 44px (`min-h-11`); rail arrows tablet-and-up.
+- **Responsive by default:** mobile-first Tailwind classes (`sm` 640, `md` 768, `lg` 1024 where the sidebar appears); tap targets at least 44px (`min-h-11`); rail arrows tablet-and-up. The only exception is the laptop sidebar, which uses 40px links **only with a mouse** (`lg:pointer-fine:min-h-10`), so a tablet held sideways keeps 44px.
+- **Form fields use 16px text** (the default). Below that, iPhones zoom the page when a field is tapped; the responsive audit checks it.
+- **Scrollbars and native controls follow the theme:** `color-scheme: dark` and thin mint scrollbars are set once in `index.css`. Don't style scrollbars per component.
 - **Images:** `loading="lazy"`, `decoding="async"`, explicit `width`/`height` (Profile's avatar isn't lazy — it's at the top of its page).
 - **No blur on cards, no `background-attachment: fixed`** (measured to cost real frame time on phones).
 - **Untrusted URLs** from the database are only linked if they start with `http://` or `https://`.

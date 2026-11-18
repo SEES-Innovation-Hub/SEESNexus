@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { buttonClassName } from "../../components/Button/buttonClassName";
 
 export function NotFound() {
   return (
@@ -7,7 +8,7 @@ export function NotFound() {
       <p className="text-sm text-white/60">
         This page doesn't exist, or hasn't been built yet.
       </p>
-      <Link to="/" className="text-sm text-sees-mustard underline hover:text-sees-mint">
+      <Link to="/" className={buttonClassName("secondary")}>
         Back to home
       </Link>
     </div>

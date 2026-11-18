@@ -15,14 +15,14 @@ export interface ProjectListParams {
   status?: ProjectStatus;
 }
 
-// Public endpoint, newest first.
+// Signed in, newest first.
 export function listProjects({ page, pageSize, category, status }: ProjectListParams = {}) {
   return unwrap<PaginatedProjects>(
     api.get("/projects", { params: { page, page_size: pageSize, category, status } }),
   );
 }
 
-// Public endpoint.
+// Signed in.
 export function getProject(id: string) {
   return unwrap<Project>(api.get(`/projects/${id}`));
 }

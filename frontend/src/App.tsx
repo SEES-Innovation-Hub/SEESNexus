@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Outlet, Route, Routes } from "react-router-dom";
+import AdminRoute from "./components/AdminRoute";
 import GuestRoute from "./components/GuestRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Landing } from "./pages/landing/Landing";
@@ -20,6 +21,11 @@ const NewProject = lazy(() => pageLoaders.newProject().then((m) => ({ default: m
 const EditProject = lazy(() => pageLoaders.editProject().then((m) => ({ default: m.EditProject })));
 const HardwareList = lazy(() => pageLoaders.hardwareList().then((m) => ({ default: m.HardwareList })));
 const MyLoans = lazy(() => pageLoaders.myLoans().then((m) => ({ default: m.MyLoans })));
+const Dashboard = lazy(() => pageLoaders.dashboard().then((m) => ({ default: m.Dashboard })));
+const AdminOverview = lazy(() => pageLoaders.adminOverview().then((m) => ({ default: m.AdminOverview })));
+const AdminLoans = lazy(() => pageLoaders.adminLoans().then((m) => ({ default: m.AdminLoans })));
+const AdminUsers = lazy(() => pageLoaders.adminUsers().then((m) => ({ default: m.AdminUsers })));
+const AdminHardware = lazy(() => pageLoaders.adminHardware().then((m) => ({ default: m.AdminHardware })));
 const ComponentsPreview = lazy(() =>
   import("./pages/dev/ComponentsPreview").then((m) => ({ default: m.ComponentsPreview })),
 );
@@ -58,8 +64,8 @@ function App() {
             </GuestRoute>
           }
         />
-        {/* Everything inside the app is for signed-in members. Admin-only pages will additionally be
-            wrapped in AdminRoute (Phase 3). */}
+        {/* Everything inside the app is for signed-in members; /admin pages are
+            for admins only on top of that. */}
         <Route
           element={
             <ProtectedRoute>
@@ -67,6 +73,7 @@ function App() {
             </ProtectedRoute>
           }
         >
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/projects" element={<ProjectsList />} />
           <Route path="/projects/new" element={<NewProject />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
@@ -74,6 +81,18 @@ function App() {
           <Route path="/hardware" element={<HardwareList />} />
           <Route path="/loans" element={<MyLoans />} />
           <Route path="/profile" element={<Profile />} />
+          <Route
+            element={
+              <AdminRoute>
+                <Outlet />
+              </AdminRoute>
+            }
+          >
+            <Route path="/admin" element={<AdminOverview />} />
+            <Route path="/admin/loans" element={<AdminLoans />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/hardware" element={<AdminHardware />} />
+          </Route>
         </Route>
         {import.meta.env.DEV && <Route path="/dev/components" element={<ComponentsPreview />} />}
         {import.meta.env.DEV && (

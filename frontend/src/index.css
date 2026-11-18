@@ -60,6 +60,36 @@
   }
 }
 
+/* Native parts the browser draws (date pickers, number arrows, dropdown lists,
+   scrollbars) follow the dark theme instead of appearing light. */
+:root {
+  color-scheme: dark;
+}
+
+/* Thin, quiet scrollbars in the brand colour everywhere (page, sidebar, lists),
+   like shadcn's, instead of the browser's white/grey bar. scrollbar-color is
+   inherited; scrollbar-width isn't, hence the universal selector. */
+:root {
+  scrollbar-color: rgb(167 255 235 / 0.22) transparent;
+}
+* {
+  scrollbar-width: thin;
+}
+/* Safari before 26 ignores the two properties above. */
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(167 255 235 / 0.22);
+    border-radius: 9999px;
+  }
+}
+
 body {
   background-color: var(--color-sees-void);
   color: white;

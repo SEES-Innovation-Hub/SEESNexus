@@ -20,11 +20,6 @@ export function LandingFooter() {
           <p className="font-medium text-sees-mint/80">Explore</p>
           <ul className="mt-1">
             <li>
-              <a href="#projects" className={linkClassName}>
-                Innovation Gallery
-              </a>
-            </li>
-            <li>
               <a href="#team" className={linkClassName}>
                 The team
               </a>

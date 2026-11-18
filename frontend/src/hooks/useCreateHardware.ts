@@ -1,15 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { returnLoan } from "../api/hardware";
+import { createHardware } from "../api/hardware";
 import { queryKeys } from "../api/queryKeys";
 
-// Returning puts a unit back on the shelf, so the hardware lists refresh too.
-export function useReturnLoan() {
+export function useCreateHardware() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: returnLoan,
+    mutationFn: createHardware,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.loans.mine });
       void queryClient.invalidateQueries({ queryKey: queryKeys.hardware.lists });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.stats });
     },
   });
 }

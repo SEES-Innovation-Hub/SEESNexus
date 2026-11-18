@@ -2,6 +2,7 @@ import { api, unwrap } from "./client";
 import type {
   Hardware,
   HardwareCategory,
+  HardwarePayload,
   HardwareStatus,
   Loan,
   LoanRequestPayload,
@@ -16,16 +17,32 @@ export interface HardwareListParams {
   status?: HardwareStatus;
 }
 
-// Public endpoint, ordered by name.
+// Signed in, ordered by name.
 export function listHardware({ page, pageSize, category, status }: HardwareListParams = {}) {
   return unwrap<PaginatedHardware>(
     api.get("/hardware", { params: { page, page_size: pageSize, category, status } }),
   );
 }
 
-// Public endpoint.
+// Signed in.
 export function getHardware(id: string) {
   return unwrap<Hardware>(api.get(`/hardware/${id}`));
+}
+
+// Admin only. A new item starts with every unit available.
+export function createHardware(payload: HardwarePayload) {
+  return unwrap<Hardware>(api.post("/hardware", payload));
+}
+
+// Admin only. Lowering quantity below the units out on loan is refused (400).
+export function updateHardware(id: string, payload: Partial<HardwarePayload>) {
+  return unwrap<Hardware>(api.put(`/hardware/${id}`, payload));
+}
+
+// Admin only. Soft delete: the item is set to MAINTENANCE and can't be borrowed;
+// its loan history is kept. updateHardware with a status puts it back.
+export function retireHardware(id: string) {
+  return unwrap<Hardware>(api.delete(`/hardware/${id}`));
 }
 
 // Signed in. Creates a PENDING loan; units only leave the shelf when an admin approves.
@@ -38,7 +55,7 @@ export function listMyLoans() {
   return unwrap<Loan[]>(api.get("/hardware/loans/my"));
 }
 
-// The borrower only, and only for an APPROVED loan.
-export function returnLoan(loanId: string) {
-  return unwrap<Loan>(api.put(`/hardware/loans/${loanId}/return`));
-}
+// Not used on purpose: PUT /hardware/loans/:id/return lets the BORROWER mark a
+// loan returned, so a student could "return" an item they still have. Returns
+// are to be confirmed by an admin who has the item in hand, once the backend
+// adds that endpoint (DECISIONS open item 20).
