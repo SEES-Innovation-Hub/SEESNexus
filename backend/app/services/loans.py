@@ -183,6 +183,32 @@ async def return_loan(db: AsyncSession, loan: HardwareLoan) -> HardwareLoan:
     return loan
 
 
+async def cancel_loan(db: AsyncSession, loan: HardwareLoan, borrower: User) -> HardwareLoan:
+    """The borrower withdraws a request nobody has acted on yet.
+
+    Only a PENDING loan can be withdrawn. A pending loan never held a unit (units
+    move on approval), so -- as with reject_loan -- the counter is untouched. Once
+    approved the item is physically out, and the way back is a return.
+    """
+    loan = (
+        await db.execute(
+            select(HardwareLoan).where(HardwareLoan.id == loan.id).with_for_update()
+        )
+    ).scalar_one()
+    if loan.borrower_id != borrower.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only cancel your own loan requests",
+        )
+    _assert_pending(loan)
+
+    loan.status = LoanStatus.CANCELLED
+
+    await db.commit()
+    await db.refresh(loan)
+    return loan
+
+
 def _assert_pending(loan: HardwareLoan) -> None:
     if loan.status is not LoanStatus.PENDING:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Loan is not pending")

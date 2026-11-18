@@ -35,6 +35,14 @@ async def _get_hardware_or_404(db: AsyncSession, hardware_id: str) -> Hardware:
     return hardware
 
 
+async def _get_loan_or_404(db: AsyncSession, loan_id: str) -> HardwareLoan:
+    result = await db.execute(select(HardwareLoan).where(HardwareLoan.id == loan_id))
+    loan = result.scalar_one_or_none()
+    if loan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")
+    return loan
+
+
 async def _assert_serial_available(db: AsyncSession, serial: str, exclude_id: str | None = None) -> None:
     """serial_number is unique in the schema; an unchecked duplicate reaches the
     database as an IntegrityError and escapes as an unenveloped 500."""
@@ -132,6 +140,21 @@ async def list_my_loans(
     my_loans = result.scalars().all()
     data = [LoanPublic.model_validate(loan).model_dump(mode="json") for loan in my_loans]
     return success(data=data)
+
+
+@router.put("/loans/{loan_id}/cancel")
+async def cancel_my_loan_request(
+    loan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """A student withdraws their own PENDING request. Admins reject instead."""
+    loan = await _get_loan_or_404(db, loan_id)
+    loan = await loans.cancel_loan(db, loan, current_user)
+    return success(
+        data=LoanPublic.model_validate(loan).model_dump(mode="json"),
+        message="Loan request cancelled",
+    )
 
 
 @router.get("/{hardware_id}")

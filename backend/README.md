@@ -68,23 +68,21 @@ always catch everything (e.g. some enum or index changes).
   handing the code to the caller would defeat the verification it gates.
 - **Admin vertical**: `/api/v1/admin/{dashboard,users,users/{id}/role,users/{id}
   (deactivate),loans,loans/{id}/approve,loans/{id}/reject}`
-- **Projects vertical**: `/api/v1/projects` — public paginated list (filterable
-  by `category` and `status`) and public detail; create is open to any
+- **Projects vertical**: `/api/v1/projects` — members-only paginated list (filterable
+  by `category` and `status`) and detail; create is open to any
   authenticated user, while update and delete require the creator or an admin.
   `member_ids` replaces the member set wholesale; `thumbnail_url` stores a
   Cloudinary URL supplied by the client, since this backend never uploads.
-- **Events vertical**: `/api/v1/events` — public event listing/detail, admin
-  event management, authenticated registration, waitlisting, and admin
-  participant status views. Events use soft deletion so registration history is
-  retained.
+- **Events vertical**: `/api/v1/events` — members-only event listing/detail,
+  admin event management, registration with waitlisting, cancellation with
+  automatic waitlist promotion, `GET /events/registrations/my`, and admin
+  participant views. Events are soft-deleted and can be restored by an admin.
+- **Articles vertical**: `/api/v1/articles` — list, read by id or slug, create
+  (contributors and admins), edit and soft-delete (author or admin), with
+  DRAFT/PUBLISHED status.
 - Standard `{status, message, data}` response envelope, including for errors
 - JWT access/refresh tokens with type checking
-- `Hardware`/`HardwareLoan` models (needed for the admin loans endpoints);
-  `Article` remains a minimal stand-in table so the dashboard counts real rows
-  instead of hardcoded numbers.
+- `Hardware`/`HardwareLoan` models, including students withdrawing a pending
+  loan request (`PUT /hardware/loans/{id}/cancel`).
 
-## Not implemented here (other verticals / later milestones)
-
-Hardware CRUD (beyond loans), Articles, and the `/upload`
-Cloudinary integration are out of scope for this slice — see the task
-assignment sheets for who owns each.
+See `docs/API-DELTA.md` for every contract change against the technical document.
