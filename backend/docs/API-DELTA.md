@@ -343,3 +343,18 @@ the connection's address.
   changed. Please log in again."`), so a reset signs out all existing sessions.
 
 Migration `f1b6d2c84a57` (tested up/down on SQLite and Postgres).
+
+---
+
+## §9 Deployment — Heroku settings and `/health`
+
+- `DATABASE_SSL` (e.g. `require` on Heroku): appended to `DATABASE_URL` as `?ssl=…`, so the app and
+  Alembic both connect encrypted. Never applied to SQLite.
+- `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` (default 5 / 5): per-worker connection pool; idle connections are
+  checked before use and recycled every 30 minutes.
+- `GET /health` now runs `SELECT 1`: `200` when the database answers, `503 "Database unavailable"`
+  otherwise, so an uptime monitor notices a database outage.
+- The Docker image listens on `$PORT` (default 8000) with `$WEB_CONCURRENCY` workers (default 2), runs
+  as a non-root user, and excludes `.env` and local databases (`.dockerignore`).
+
+See `DEPLOYMENT.md` at the repository root.

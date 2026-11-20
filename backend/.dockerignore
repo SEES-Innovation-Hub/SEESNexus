@@ -1,0 +1,13 @@
+# Never bake local secrets or data into the image: configuration comes from
+# the platform's environment variables.
+.env
+.env.*
+!.env.example
+*.db
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+docker-compose*.yml

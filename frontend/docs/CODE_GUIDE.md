@@ -137,7 +137,7 @@ Errors: `errorMessage(error, "fallback text")` returns the backend's own message
 - **An expired access token:** the response interceptor sees a `401`, asks `/auth/refresh` for a new token (only **one** refresh runs at a time; other failing requests wait for it), then retries the original request.
 - **A dead refresh token:** the client clears the tokens and calls the handler `AuthProvider` registered, which empties the user; `ProtectedRoute` then redirects to `/login`. Public pages are untouched.
 - **Blocked storage:** `tokenStore` keeps the tokens in `localStorage`; if the browser throws on every storage call it falls back to memory, so the app still renders and login works until the tab closes.
-- **Where the API is:** `client.ts` builds every URL, the refresh call included, from `VITE_API_URL` (empty in development, where Vite proxies `/api`). Production builds on Vercel set it to the Render backend; see `.env.example`.
+- **Where the API is:** `client.ts` builds every URL, the refresh call included, from `VITE_API_URL` (empty in development, where Vite proxies `/api`). Production builds on Vercel set it to the Heroku backend; see `.env.example` and `DEPLOYMENT.md`.
 
 ### 3.3 Pages load on demand
 `routes/pageLoaders.ts` is the single place that says how each lazy page is loaded:

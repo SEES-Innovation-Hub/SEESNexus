@@ -1,13 +1,17 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.database import init_models
+from app.core.database import engine, init_models
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -52,6 +56,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.get("/health")
 async def health():
+    """For uptime monitors: 200 only when the API can reach its database."""
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception:  # any failure here means "not healthy"
+        logger.exception("Health check could not reach the database")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": "Database unavailable", "data": None},
+        )
     return {"status": "success", "message": "SEES Nexus API is running", "data": None}
 
 

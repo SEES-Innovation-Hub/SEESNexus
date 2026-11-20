@@ -14,7 +14,7 @@ npx tsc -b && npx oxlint && npm run build
 ```
 
 **Deploying (Vercel):** set `VITE_API_URL` to the backend's origin, e.g.
-`https://seesnexus.onrender.com` (see `.env.example`). `vercel.json` sends every
+`https://<your-app>.herokuapp.com` (see `.env.example`). `vercel.json` sends every
 path to `index.html` so deep links like `/events/123` load on refresh.
 
 How the code is organised, and why: [docs/CODE_GUIDE.md](docs/CODE_GUIDE.md).

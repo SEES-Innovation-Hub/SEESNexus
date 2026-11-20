@@ -137,7 +137,7 @@ async def test_client_ip_uses_trusted_proxy_entries_only(monkeypatch):
     monkeypatch.setattr(settings, "TRUSTED_PROXY_COUNT", 0)
     assert rate_limit.client_ip(make("1.2.3.4")) == "10.0.0.5"
 
-    # One proxy (Render): the address it appended, not the client-written ones before it.
+    # One proxy (Heroku's router): the address it appended, not the client-written ones before it.
     monkeypatch.setattr(settings, "TRUSTED_PROXY_COUNT", 1)
     assert rate_limit.client_ip(make("6.6.6.6, 203.0.113.7")) == "203.0.113.7"
     assert rate_limit.client_ip(make(None)) == "10.0.0.5"

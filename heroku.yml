@@ -1,0 +1,13 @@
+# Heroku "container" stack: builds the backend image from backend/Dockerfile
+# (backend/ is the build context) and runs it as the web process.
+# Set up with:  heroku stack:set container -a <app>   (see DEPLOYMENT.md)
+build:
+  docker:
+    web: backend/Dockerfile
+
+# Runs before every new release goes live. If a migration fails, the release
+# is stopped and the previous version keeps serving.
+release:
+  image: web
+  command:
+    - alembic upgrade head

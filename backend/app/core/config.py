@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     # app is runnable out of the box; docker-compose.yml wires up real
     # Postgres per Tech Doc §9.2.
     DATABASE_URL: str = "sqlite+aiosqlite:///./sees_nexus.db"
+    # "require" on Heroku, whose Postgres refuses unencrypted connections.
+    # Added to DATABASE_URL as ?ssl=..., so the app and Alembic both use it.
+    DATABASE_SSL: str = ""
+    # Connections each worker process may hold. Workers x (pool + overflow)
+    # must stay under the database plan's limit (20 on Heroku essential-0).
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
 
     # --- Auth / JWT ---
     SECRET_KEY: str = DEFAULT_SECRET_KEY
@@ -45,8 +52,8 @@ class Settings(BaseSettings):
     # --- Client IP behind a proxy ---
     # How many proxies sit in front of the app and append to X-Forwarded-For.
     # Rate limits are per client IP; with 0 the TCP peer is used, which behind
-    # Render's load balancer is the balancer itself, so every user would share
-    # one limit. Set to 1 on Render. Never set it higher than the real number
+    # Heroku's router is the router itself, so every user would share
+    # one limit. Set to 1 on Heroku. Never set it higher than the real number
     # of proxies: entries further left are written by the client and can be faked.
     TRUSTED_PROXY_COUNT: int = 0
 
@@ -69,6 +76,13 @@ class Settings(BaseSettings):
             if value.startswith(prefix):
                 return "postgresql+asyncpg://" + value[len(prefix):]
         return value
+
+    @model_validator(mode="after")
+    def _add_ssl_to_database_url(self) -> "Settings":
+        if self.DATABASE_SSL and not self.is_sqlite and "ssl=" not in self.DATABASE_URL:
+            joiner = "&" if "?" in self.DATABASE_URL else "?"
+            self.DATABASE_URL = f"{self.DATABASE_URL}{joiner}ssl={self.DATABASE_SSL}"
+        return self
 
     @model_validator(mode="after")
     def _refuse_default_secret_outside_sqlite(self) -> "Settings":

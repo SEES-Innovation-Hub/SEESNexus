@@ -91,7 +91,7 @@ always catch everything (e.g. some enum or index changes).
 ## Configuration notes
 
 - `DATABASE_URL` accepts `postgres://` / `postgresql://` URLs as hosts like
-  Render give them, and switches them to the async driver.
+  Heroku give them, and switches them to the async driver.
 - `SECRET_KEY` must be set to a private value whenever the database is not
   SQLite; the app refuses to start otherwise, since every JWT is signed with it.
 - Tables are only auto-created for SQLite. Postgres is managed by Alembic:
@@ -103,7 +103,7 @@ always catch everything (e.g. some enum or index changes).
 - **Rate limits** (login, email codes, password reset, admin-key checks) are
   counted in Postgres (`rate_limit_events`), so they hold across restarts and
   instances with no Redis. They're per client IP and per email; set
-  `TRUSTED_PROXY_COUNT=1` on Render or every visitor shares the load
+  `TRUSTED_PROXY_COUNT=1` on Heroku or every visitor shares the load
   balancer's IP. The numbers live at the top of `app/services/rate_limit.py`.
 - Email (OTP codes, password resets, waitlist promotions) goes through Brevo when
   `BREVO_API_KEY` is set; `BREVO_SENDER_EMAIL` must be a sender verified in Brevo.

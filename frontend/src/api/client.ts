@@ -8,8 +8,8 @@ import { tokenStore } from "./tokenStore";
 
 // Where the backend lives. In development this is empty and Vite proxies /api
 // to localhost:8000 (vite.config.ts). A production build that is served from a
-// different host than the API (Vercel + Render) sets VITE_API_URL to the API's
-// origin, e.g. https://seesnexus.onrender.com, when it is built.
+// different host than the API (Vercel + Heroku) sets VITE_API_URL to the API's
+// origin, e.g. https://<your-app>.herokuapp.com, when it is built.
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
 const API_BASE_URL = `${API_ORIGIN}/api/v1`;
 
