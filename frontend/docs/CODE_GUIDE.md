@@ -202,7 +202,7 @@ Register (details) --sendCode(email)--> OtpVerification --verifyCode(email, code
 | Hero headline | smaller text | larger text |
 | Project rail | swipe; arrows hidden | arrows visible (44px) |
 | Pillars | stacked | three columns |
-| Team | 2 x 2 | 4 across |
+| Team | stacked, narrow cards | three across (from 640px) |
 | Footer | stacked | three columns |
 
 `Landing` also calls `usePrefetchAuthPages()`. Project cards render only `http(s)` demo and GitHub links (the values are user-typed).
