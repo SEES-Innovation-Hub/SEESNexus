@@ -7,7 +7,7 @@ events and news in one place.
 | | |
 |---|---|
 | `backend/` | FastAPI + async SQLAlchemy + PostgreSQL, Alembic migrations, pytest suite. [backend/README.md](backend/README.md) |
-| `frontend/` | React + Vite + Tailwind single-page app. [frontend/README.md](frontend/README.md) |
+| `frontend/` | React + Vite + Tailwind single-page app. [frontend/README.md](frontend/README.md) 
 
 ## Run it locally
 
