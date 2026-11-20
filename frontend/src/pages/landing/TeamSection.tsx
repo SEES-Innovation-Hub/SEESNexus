@@ -5,12 +5,16 @@ interface TeamMember {
   imageUrl?: string;
 }
 
-// PLACEHOLDER content — swap in the real names, roles and photos.
+// Photos are 640x640 WebP in public/team/, cropped square on the face, with
+// the camera's metadata (time, device, location) stripped.
 const TEAM: TeamMember[] = [
-  { name: "John Doe", role: "Frontend Lead" },
-  { name: "Doe John", role: "Backend Lead" },
-  { name: "Jane Roe", role: "Design Lead" },
-  { name: "Richard Roe", role: "Hardware Lead" },
+  { name: "Ifeoluwa Adeyemo", role: "Frontend Engineer", imageUrl: "/team/ifeoluwa.webp" },
+  { name: "Olaitan Ismail", role: "Backend Engineer", imageUrl: "/team/olaitan-ismail.webp" },
+  {
+    name: "Fakorode Henry",
+    role: "Technical Development Lead & Backend Engineer",
+    imageUrl: "/team/fakorode-henry.webp",
+  },
 ];
 
 function PlaceholderAvatar() {
@@ -33,13 +37,13 @@ function PlaceholderAvatar() {
 
 function TeamMemberCard({ member }: { member: TeamMember }) {
   return (
-    <li className="overflow-hidden rounded-3xl border border-sees-teal/40 bg-gradient-card shadow-sees-card">
+    <li className="flex flex-col overflow-hidden rounded-3xl border border-sees-teal/40 bg-gradient-card shadow-sees-card">
       {member.imageUrl ? (
         <img
           src={member.imageUrl}
           alt={member.name}
-          width={400}
-          height={400}
+          width={640}
+          height={640}
           loading="lazy"
           decoding="async"
           className="aspect-square w-full object-cover"
@@ -49,9 +53,9 @@ function TeamMemberCard({ member }: { member: TeamMember }) {
           <PlaceholderAvatar />
         </div>
       )}
-      <div className="bg-sees-void/40 px-4 py-5 text-center">
-        <h3 className="text-lg font-semibold text-white">{member.name}</h3>
-        <p className="mt-1 text-sm font-semibold uppercase tracking-wider text-sees-mint/60">
+      <div className="flex-1 bg-sees-void/40 px-4 py-5 text-center">
+        <h3 className="text-lg font-semibold wrap-anywhere text-white">{member.name}</h3>
+        <p className="mt-1 text-sm font-semibold uppercase tracking-wider text-balance text-sees-mint/60">
           {member.role}
         </p>
       </div>
@@ -69,7 +73,7 @@ export function TeamSection() {
       <h2 id="team-heading" className="text-3xl font-semibold text-sees-mint">
         The people behind Sees Nexus
       </h2>
-      <ul className="mt-8 grid grid-cols-2 gap-5 md:grid-cols-4">
+      <ul className="mx-auto mt-8 grid max-w-xs gap-5 sm:max-w-none sm:grid-cols-3">
         {TEAM.map((member) => (
           <TeamMemberCard key={member.name} member={member} />
         ))}
