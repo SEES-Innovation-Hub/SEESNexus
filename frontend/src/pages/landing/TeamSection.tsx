@@ -8,7 +8,7 @@ interface TeamMember {
 // Photos are 640x640 WebP in public/team/, cropped square on the face, with
 // the camera's metadata (time, device, location) stripped.
 const TEAM: TeamMember[] = [
-  { name: "Ifeoluwa", role: "Frontend Engineer", imageUrl: "/team/ifeoluwa.webp" },
+  { name: "Ifeoluwa Adeyemo", role: "Frontend Engineer", imageUrl: "/team/ifeoluwa.webp" },
   { name: "Olaitan Ismail", role: "Backend Engineer", imageUrl: "/team/olaitan-ismail.webp" },
   {
     name: "Fakorode Henry",
